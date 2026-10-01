@@ -1,0 +1,78 @@
+[
+  {
+    "name": "health",
+    "pass": true
+  },
+  {
+    "name": "admin requires auth",
+    "pass": true
+  },
+  {
+    "name": "CSRF origin rejection",
+    "pass": true
+  },
+  {
+    "name": "independent admin login",
+    "pass": true
+  },
+  {
+    "name": "product identity",
+    "pass": true
+  },
+  {
+    "name": "cross product rejected",
+    "pass": true
+  },
+  {
+    "name": "arbitrary URL rejected",
+    "pass": true
+  },
+  {
+    "name": "mode injection rejected",
+    "pass": true
+  },
+  {
+    "name": "config V2 publish",
+    "pass": true
+  },
+  {
+    "name": "config read changed",
+    "pass": true
+  },
+  {
+    "name": "rollback higher revision",
+    "pass": true
+  },
+  {
+    "name": "rollback restored content",
+    "pass": true
+  },
+  {
+    "name": "empty independent lost",
+    "pass": true
+  },
+  {
+    "name": "empty independent resources",
+    "pass": true
+  },
+  {
+    "name": "empty independent announcements",
+    "pass": true
+  },
+  {
+    "name": "no formal update",
+    "pass": true
+  },
+  {
+    "name": "no school credentials route",
+    "pass": true
+  },
+  {
+    "name": "logout",
+    "pass": true
+  },
+  {
+    "name": "session invalidated",
+    "pass": true
+  }
+]

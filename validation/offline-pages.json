@@ -1,0 +1,8 @@
+{
+  "backendStopped": true,
+  "configFailureSafe": true,
+  "servicesAvailable": true,
+  "aboutPrivacyWebsitePages": "PASS_EMULATOR",
+  "schoolCookieClearAction": "PASS_EMULATOR",
+  "realDevice": "PENDING_REAL_DEVICE"
+}

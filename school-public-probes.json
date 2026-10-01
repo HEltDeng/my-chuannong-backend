@@ -1,0 +1,102 @@
+[
+  {
+    "url": "https://www.sicau.edu.cn/",
+    "status": 200,
+    "finalHost": "www.sicau.edu.cn",
+    "title": "四川农业大学",
+    "bytesRead": 166831,
+    "authenticated": false
+  },
+  {
+    "url": "https://jiaowu.sicau.edu.cn/",
+    "status": "FAILED",
+    "errorType": "URLError",
+    "authenticated": false
+  },
+  {
+    "url": "https://auth.sicau.edu.cn/wui/",
+    "status": 200,
+    "finalHost": "auth.sicau.edu.cn",
+    "title": "川农e认证 - 统一身份认证",
+    "bytesRead": 847,
+    "authenticated": false
+  },
+  {
+    "url": "https://ecology.sicau.edu.cn/",
+    "status": 200,
+    "finalHost": "ecology.sicau.edu.cn",
+    "title": "",
+    "bytesRead": 3235,
+    "authenticated": false
+  },
+  {
+    "url": "https://ywtb.sicau.edu.cn/",
+    "status": 200,
+    "finalHost": "ywtb.sicau.edu.cn",
+    "title": "一网通办",
+    "bytesRead": 1369,
+    "authenticated": false
+  },
+  {
+    "url": "https://op.sicau.edu.cn/",
+    "status": 200,
+    "finalHost": "op.sicau.edu.cn",
+    "title": "四川农业大学校园统一支付平台",
+    "bytesRead": 22029,
+    "authenticated": false
+  },
+  {
+    "url": "https://www.sicau.edu.cn/ggfw/rlxl.htm",
+    "status": 200,
+    "finalHost": "www.sicau.edu.cn",
+    "title": "日历校历-四川农业大学",
+    "bytesRead": 55864,
+    "authenticated": false
+  },
+  {
+    "url": "https://rsc.sicau.edu.cn/info/1014/4303.htm",
+    "status": 200,
+    "finalHost": "rsc.sicau.edu.cn",
+    "title": "",
+    "bytesRead": 29309,
+    "authenticated": false
+  },
+  {
+    "url": "https://xcb.sicau.edu.cn/info/1023/1315.htm",
+    "status": 200,
+    "finalHost": "xcb.sicau.edu.cn",
+    "title": "四川农业大学校徽-四川农业大学 党委宣传部",
+    "bytesRead": 32132,
+    "authenticated": false
+  },
+  {
+    "url": "https://www.sicau.edu.cn/info/1005/23700.htm",
+    "status": 200,
+    "finalHost": "www.sicau.edu.cn",
+    "title": "第十章 学校标识-四川农业大学",
+    "bytesRead": 55580,
+    "authenticated": false
+  },
+  {
+    "url": "https://www.sicau.edu.cn/xywh/xyfg.htm",
+    "status": 200,
+    "finalHost": "www.sicau.edu.cn",
+    "title": "校园风光-四川农业大学",
+    "bytesRead": 66690,
+    "authenticated": false
+  },
+  {
+    "url": "https://xcb.sicau.edu.cn/xywh/xyfg.htm",
+    "status": 200,
+    "finalHost": "xcb.sicau.edu.cn",
+    "title": "校园风光-四川农业大学 党委宣传部",
+    "bytesRead": 34497,
+    "authenticated": false
+  },
+  {
+    "url": "https://lib.sicau.edu.cn/",
+    "status": "FAILED",
+    "errorType": "URLError",
+    "authenticated": false
+  }
+]

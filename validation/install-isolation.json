@@ -1,0 +1,15 @@
+{
+  "installedApkSha256Matches": true,
+  "apkSha256": "DDC90156AB6F166A3A629EB1822A2CA9CA1795FEABA5F661F2C489B40F764E19",
+  "coInstalledPackages": [
+    "com.mychuannong.app",
+    "com.mychangli.app"
+  ],
+  "distinctAppIds": [
+    "10216",
+    "10217"
+  ],
+  "originalAppLaunched": false,
+  "device": "emulator-5580",
+  "realDevice": "PENDING_REAL_DEVICE"
+}
