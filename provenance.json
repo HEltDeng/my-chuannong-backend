@@ -1,80 +1,10 @@
-[
-  {
-    "source": "D:\\Codex\\01_App-应用开发\\001_MyChangLi-我的长理\\02_Worktrees\\my-changli-v1.0.4\\gradlew",
-    "sourceSha256": "c15a47b60a4eeede9ffee33433fd990d8b6236607372b9bb1f6dc51b07b78c39",
-    "target": "01_Repositories\\my-chuannong-android\\gradlew",
-    "adaptedPackage": false
-  },
-  {
-    "source": "D:\\Codex\\01_App-应用开发\\001_MyChangLi-我的长理\\02_Worktrees\\my-changli-v1.0.4\\gradlew.bat",
-    "sourceSha256": "4cfd31ae7541c93f9c4161a20cb9d3093a1f2e09d4047fb3cad60021d1b4c3e0",
-    "target": "01_Repositories\\my-chuannong-android\\gradlew.bat",
-    "adaptedPackage": false
-  },
-  {
-    "source": "D:\\Codex\\01_App-应用开发\\001_MyChangLi-我的长理\\02_Worktrees\\my-changli-v1.0.4\\gradle\\wrapper\\gradle-wrapper.jar",
-    "sourceSha256": "e996d452d2645e70c01c11143ca2d3742734a28da2bf61f25c82bdc288c9e637",
-    "target": "01_Repositories\\my-chuannong-android\\gradle\\wrapper\\gradle-wrapper.jar",
-    "adaptedPackage": false
-  },
-  {
-    "source": "D:\\Codex\\01_App-应用开发\\001_MyChangLi-我的长理\\02_Worktrees\\my-changli-v1.0.4\\gradle\\wrapper\\gradle-wrapper.properties",
-    "sourceSha256": "b8309b541d84bf6f38b4d52a0843ac5406e09a6889d27f20a6723163d3bba6d0",
-    "target": "01_Repositories\\my-chuannong-android\\gradle\\wrapper\\gradle-wrapper.properties",
-    "adaptedPackage": false
-  },
-  {
-    "source": "D:\\Codex\\01_App-应用开发\\001_MyChangLi-我的长理\\02_Worktrees\\my-changli-v1.0.4\\gradle\\libs.versions.toml",
-    "sourceSha256": "172baf0ace33aff5293d2d1e630fca47c40b7854361f3791e5a51fd43224907e",
-    "target": "01_Repositories\\my-chuannong-android\\gradle\\libs.versions.toml",
-    "adaptedPackage": false
-  },
-  {
-    "source": "D:\\Codex\\01_App-应用开发\\001_MyChangLi-我的长理\\02_Worktrees\\my-changli-v1.0.4\\LICENSE",
-    "sourceSha256": "18123aab93fa81b922a404728af0067f2347a71bce829074fcbb6509cb2008b0",
-    "target": "01_Repositories\\my-chuannong-android\\LICENSE",
-    "adaptedPackage": false
-  },
-  {
-    "source": "D:\\Codex\\01_App-应用开发\\001_MyChangLi-我的长理\\02_Worktrees\\my-changli-v1.0.4\\THIRD_PARTY_NOTICES.md",
-    "sourceSha256": "f29518f676b69060e78db5480305ad9c74e5f1d0aa4e549b08c1183a2b9b816a",
-    "target": "01_Repositories\\my-chuannong-android\\THIRD_PARTY_NOTICES.md",
-    "adaptedPackage": false
-  },
-  {
-    "source": "D:\\Codex\\01_App-应用开发\\001_MyChangLi-我的长理\\02_Worktrees\\my-changli-v1.0.4\\app\\src\\main\\java\\com\\mychangli\\app\\feature\\common\\compose_ui\\FunctionItem.kt",
-    "sourceSha256": "63363ea003ab841e4df007137a3239834cd8c9a74f7161247101d3dc7ed6205a",
-    "target": "01_Repositories\\my-chuannong-android\\app\\src\\main\\java\\com\\mychuannong\\app\\feature\\common\\compose_ui\\FunctionItem.kt",
-    "adaptedPackage": true
-  },
-  {
-    "source": "D:\\Codex\\01_App-应用开发\\001_MyChangLi-我的长理\\02_Worktrees\\my-changli-v1.0.4\\app\\src\\main\\java\\com\\mychangli\\app\\feature\\common\\compose_ui\\FunctionSection.kt",
-    "sourceSha256": "09d65e97effbff82a2092b6033b05638eb480d7e382cfe7eb09436df129c2c76",
-    "target": "01_Repositories\\my-chuannong-android\\app\\src\\main\\java\\com\\mychuannong\\app\\feature\\common\\compose_ui\\FunctionSection.kt",
-    "adaptedPackage": true
-  },
-  {
-    "source": "D:\\Codex\\01_App-应用开发\\001_MyChangLi-我的长理\\02_Worktrees\\my-changli-v1.0.4\\app\\src\\main\\java\\com\\mychangli\\app\\feature\\common\\compose_ui\\FunctionPalette.kt",
-    "sourceSha256": "0367a9587aac7a14ad08351a6f8ad3e3921d8845c49b9d28d8c45361a5ad409c",
-    "target": "01_Repositories\\my-chuannong-android\\app\\src\\main\\java\\com\\mychuannong\\app\\feature\\common\\compose_ui\\FunctionPalette.kt",
-    "adaptedPackage": true
-  },
-  {
-    "source": "D:\\Codex\\01_App-应用开发\\001_MyChangLi-我的长理\\01_Repositories\\CodexWorkspace-projects\\my-changli-backend\\security.py",
-    "sourceSha256": "56c8bdc270e5bd307075256650979bfcc580d93dc5fed71ebde36ce7e71b3f18",
-    "target": "01_Repositories\\my-chuannong-backend\\security.py",
-    "adaptedPackage": false
-  },
-  {
-    "source": "D:\\Codex\\01_App-应用开发\\001_MyChangLi-我的长理\\01_Repositories\\CodexWorkspace-projects\\my-changli-backend\\admin\\styles.css",
-    "sourceSha256": "e9842fb8f152bac45132c20a03f48dc34fad48ab29d6c1bc2911adb948917427",
-    "target": "01_Repositories\\my-chuannong-backend\\admin\\styles.css",
-    "adaptedPackage": false
-  },
-  {
-    "source": "D:\\Codex\\01_App-应用开发\\001_MyChangLi-我的长理\\01_Repositories\\CodexWorkspace-projects\\my-changli-backend\\THIRD_PARTY_NOTICES.md",
-    "sourceSha256": "1d5443b03d405bf20e37c9e1d0ee60e98cb5026e9c0471a355ef467b4b6869eb",
-    "target": "01_Repositories\\my-chuannong-backend\\THIRD_PARTY_NOTICES.md",
-    "adaptedPackage": false
-  }
-]
+{
+  "productId": "my-chuannong",
+  "schoolId": "sicau",
+  "migration": "full accepted V1.0.5 product restoration",
+  "branch": "codex/restore-v105-adaptation",
+  "androidBaseline": "1d19370dc9a22817b0286372f5f663a3e36ae889",
+  "backendBaseline": "30a1c5fb37e7803ecadb2fd43b5b05c34f61eb37",
+  "privateInternalPreview": true,
+  "schoolParserStatus": "NOT_IMPLEMENTED_PENDING_AUTHENTICATED_PAGE_STRUCTURE"
+}

@@ -1,11 +1,9 @@
-# 隔离与敏感数据审计
+# 数据与会话边界
 
-母版审计范围：settings/ui/BindingUserActivity.kt（原生绑定）、widget/dialog/SSOWebviewDialog.kt（学校认证）、core/security/SchoolSessionCoordinator.kt（会话）、common/data/local/mmkv/StudentInfoManager.kt（学生信息）、feature/timetable/viewmodel/TimeTableViewModel.kt、feature/common/ui/ScoreInquiryActivity.kt、ExamArrangementActivity.kt（学校解析）、core/PlanetApplication.kt（启动任务）、overview/data/OverviewRepository.kt。以上均未复制。CSUSTDataGet AAR 未复制也未依赖。
-
-客户端仅导出通用 Compose 卡片组件和工程 wrapper。清单没有 FileProvider、自定义权限、Deep/App Link、广播、通知渠道、桌面小组件、学校数据数据库或后台同步任务，因此没有旧身份残留；仅主 Activity exported，学校 WebView Activity 不对外导出。新版 AndroidX 自带签名级动态接收器权限由本 applicationId 派生。allowBackup=false，数据和 WebView 位于独立包沙箱，无共享 UID。
-
-旧生产 URL、旧 APK 更新地址、长理网站、寝室数据、校历、开学日期、用户和密钥不在新运行时源码及资源中。原 LICENSE/来源声明允许保留来源名称，不能当运行时残留盲目替换。
-
-学校网站 iframe/脚本内部行为由网站自身控制。本产品不注册 JS Bridge、不 evaluateJavascript、不调用 getCookie、不导出 Cookie，不记录跳转参数。不承诺第三方网站完全不处理个人信息。隐私说明对应当前行为。
-
-后端无学校认证中间层，无学校数据抓取或出站网络代码。空 SQLite 数据库独立初始化；凭据和数据库被忽略并在提交前检查实际暂存文件。原始采集表及联系人仅保留项目 03_LocalReferences，本目录不属于任何新 Git 仓库。
+- applicationId com.mychuannong.app，独立 Android 沙箱、Room/MMKV、WebView Cookie。学校解绑清理本包学校会话和本地学习缓存；平台退出独立处理。
+- SchoolWebActivity 只接受 HTTPS 与解析后明确主机集合；拒绝 userinfo/非443端口/证书错误，无通用 JavaScript Bridge，不伪装微信。
+- SchoolSyncEngine 是唯一新的课程/成绩/考试刷新入口。SchoolReader 身份/课表/成绩/考试解析目前明确 PARSER_PENDING。页面加载结束只标记身份尚未确认。所有模拟或合成资料不进入普通安装用户数据区。
+- 缓存成功与失败分开；课程刷新按明确学期在 Room 事务中更新，失败保留缓存，成绩和考试分项保存；换号/解绑清除旧账号缓存。真实身份解析和真实学校网络尚未验收。
+- 本产品平台账号、公告、配置和更新通过独立本地后台；响应必须具备匹配的产品与应用标识。无母版后端/官网/latest.json 回退。正式强更关闭。
+- 凭据在 D:/Codex-Local-Secrets/MyChuannong，不在仓库。学校密码在学校页面输入，本产品不保存密码。未配置短信/邮件/推送，没有模拟发送成功。
+- 非四川农业大学官方 App；临时绿色属于产品主题，不声称学校官方标准色。

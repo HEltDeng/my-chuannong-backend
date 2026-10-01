@@ -3,7 +3,7 @@
   "apkSha256": "DDC90156AB6F166A3A629EB1822A2CA9CA1795FEABA5F661F2C489B40F764E19",
   "coInstalledPackages": [
     "com.mychuannong.app",
-    "com.mychangli.app"
+    "com.mychuannong.app"
   ],
   "distinctAppIds": [
     "10216",

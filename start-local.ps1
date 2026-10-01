@@ -1,3 +1,3 @@
-$ErrorActionPreference='Stop'
+$ErrorActionPreference="Stop"
 Set-Location $PSScriptRoot
-& '.\.venv\Scripts\python.exe' server.py
+& "$PSScriptRoot\.venv\Scripts\python.exe" "$PSScriptRoot\run_local.py"
