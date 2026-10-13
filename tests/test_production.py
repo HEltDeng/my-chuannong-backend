@@ -597,7 +597,7 @@ class ProductionUnitTest(unittest.TestCase):
             name.lower(): version
             for name, version in (line.split("==", 1) for line in lines)
         }
-        self.assertEqual("46.0.7", locked["cryptography"])
+        self.assertEqual("50.0.0", locked["cryptography"])
         self.assertEqual("12.3.0", locked["pillow"])
         self.assertEqual("3.0.2", locked["waitress"])
         self.assertEqual(

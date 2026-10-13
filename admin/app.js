@@ -1,5 +1,5 @@
 const state = {
-  token: sessionStorage.getItem("myChangliAdminToken") || "",
+  token: sessionStorage.getItem("myChuannongAdminToken") || "",
   page: "overview",
   venues: [],
   admin: null,
@@ -335,7 +335,7 @@ async function api(path, options = {}) {
 function showLogin() {
   state.token = "";
   state.admin = null;
-  sessionStorage.removeItem("myChangliAdminToken");
+  sessionStorage.removeItem("myChuannongAdminToken");
   $("#app-view").classList.add("hidden");
   $("#login-view").classList.remove("hidden");
   $("#login-password").value = "";
@@ -1042,7 +1042,7 @@ $("#login-form").addEventListener("submit", async (event) => {
     });
     if (data.user.role !== "ADMIN") throw new Error("该账号没有管理员权限");
     state.token = data.token;
-    sessionStorage.setItem("myChangliAdminToken", state.token);
+    sessionStorage.setItem("myChuannongAdminToken", state.token);
     $("#login-password").value = "";
     await showApp();
   } catch (error) {

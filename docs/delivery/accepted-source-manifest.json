@@ -1,0 +1,114 @@
+{
+  "product": "MyChuannong",
+  "date": "2026-10-13",
+  "branch": "codex/accepted-preview9",
+  "scope": "Audited backend application, admin, schema, dependency and test sources",
+  "hash_rules": "SHA-256 of UTF-8 files with CRLF normalized to LF; binary files unchanged. Documentation and the verifier itself are excluded. This is a baseline for intentional future changes, not a restriction on development.",
+  "files": [
+    {
+      "path": "admin/app.js",
+      "sha256": "268a6755d33edeb1de4c99af4d7e8d92f7e8b3723a8199608627be6eb75d24f5",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "admin/assets/my-chuannong-app-icon.png",
+      "sha256": "15b28c3ded7f852c7e3f1ef9b5ddcf3371d00eabbac6b3ed3129f316a4c40689",
+      "encoding": "binary"
+    },
+    {
+      "path": "admin/index.html",
+      "sha256": "db2d6f33289381a7b1e113a4e4d56556cf9a68669077d67d5ca6577252065b3f",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "admin/styles.css",
+      "sha256": "a73f8c18319b9073929b5675f7b727281f88bdf9a67402de7617c27720ba3ef4",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "core.py",
+      "sha256": "43276beca996d6669371a302a9d0fd26d412b80304abcb73ec8e1c58b1f9a921",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "logging_config.py",
+      "sha256": "2c9ba99d28369873b8ecc5a9c266a5ffc08c5045e1080e070cfa6df5245b92f7",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "manage.py",
+      "sha256": "2127a2c881501001e784ceacacc9bbca34d3460ac00c7232a851fadd4b63236b",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "production.py",
+      "sha256": "cca225562be8558ca52c381dd71738170ae953a7f3c613c0c41817d8578dda15",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "requirements.lock.txt",
+      "sha256": "877bca542c06c6ebd018433198b92b2877901e1b6a2a3e736dc506498a0e73d8",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "requirements.txt",
+      "sha256": "90aacc0155c882d8b8577951f42eff3b768b5989ccd2a604943c67a3c275f64f",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "run_local.py",
+      "sha256": "50e0244ac4f19c02e4220441dc4e7e6ffd1f6fd9506d32cdfb41217e634df46c",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "runtime_config.py",
+      "sha256": "0a284673958048efa8ea28516ad375314db18039c55f117900bf7f1f7f4a5877",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "schema.sql",
+      "sha256": "27d5b696905f5cd4136d3e60d2a8374eac016f92fba59680523784ade5ff0974",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "schemas/app-config-v1.schema.json",
+      "sha256": "bfa796380a0caeb029935ddfbc59c7b9c6e0be396b43fa8b4865bf6429a982be",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "security.py",
+      "sha256": "4c252be34243b50f2ba97e2e59987a98ce0bcb76d7cddb6c2e4f31cd7922b122",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "server.py",
+      "sha256": "fff1ed1c6272b371b343f6527c7f1f34e09b896ed15fc5dbffe0a096ee5a3247",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "start-local.ps1",
+      "sha256": "f0d300e09de89390b3f2e64faec87f079caf478e2a628c569e759095754394b3",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "tests/test_api.py",
+      "sha256": "830f9eea74118681a4ccfacf81bdc2eb759159e27eaecadb2c7c056349ab7b9f",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "tests/test_audit_guards.py",
+      "sha256": "f5f5bd1d6ebd96b7644ac9d89ec1638982ce5e15f8c350caf4dae9467aeddf9a",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "tests/test_production.py",
+      "sha256": "7c5500240d93070db3a06d1201698ca36b33440534bd5d0c91dd30734d81becc",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "wsgi.py",
+      "sha256": "71db55faa6fb33d7e8f2f6acb5105a9e64f7353c8956cc190767942ddf34689a",
+      "encoding": "utf-8-lf"
+    }
+  ]
+}

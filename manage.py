@@ -1,4 +1,4 @@
-"""Local administration commands for My Changli.
+"""Local administration commands for MyChuannong.
 
 Passwords are read with getpass and never echoed or written to command history.
 """

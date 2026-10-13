@@ -2424,7 +2424,7 @@ class ApiTest(unittest.TestCase):
 
     def test_admin_web_assets_are_served_locally(self):
         for path, expected in (
-            ("/admin/", "生产管理后台"),
+            ("/admin/", "内部预览管理后台"),
             ("/admin/styles.css", "--blue"),
             ("/admin/app.js", "sessionStorage"),
         ):

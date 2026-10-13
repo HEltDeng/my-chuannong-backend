@@ -96,9 +96,11 @@ ROLE_PERMISSIONS = {
 CONTROLLED_FEATURES = {"sports_reservation", "lost_found", "resource_library"}
 DEFAULT_DEVICE_NICKNAME = "川农同学"
 OFFICIAL_PACKAGE_NAME = "com.mychuannong.app"
-OFFICIAL_SIGNING_CERTIFICATE_SHA256 = (
-    "2C3B934931C26719C1A55FA707760A41E18BA15B00561F97691FE1D452F4BF3D"
-)
+# No inherited signing identity. Publishing requires an explicitly configured
+# MyChuannong release certificate; an internal debug APK is not a release key.
+OFFICIAL_SIGNING_CERTIFICATE_SHA256 = os.environ.get(
+    "MY_CHUANNONG_SIGNING_CERTIFICATE_SHA256", ""
+).strip().upper()
 
 # App-config is a deliberately small, allow-listed control plane.  It can
 # select existing native routes and official-site URLs, but cannot introduce
@@ -7384,6 +7386,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                 if certificate and not re.fullmatch(r"[0-9A-F]{64}", certificate):
                     raise ApiError(400, "INVALID_SIGNING_CERTIFICATE", "签名证书 SHA-256 格式无效")
                 if status == "PUBLISHED":
+                    if not re.fullmatch(r"[0-9A-F]{64}", OFFICIAL_SIGNING_CERTIFICATE_SHA256):
+                        raise ApiError(409, "RELEASE_NOT_CONFIGURED", "尚未配置本产品正式签名，不能发布版本")
                     if not download_url or not sha256 or apk_size is None:
                         raise ApiError(409, "PUBLISHED_ARTIFACT_REQUIRED", "已发布版本必须具备下载地址、SHA-256 和 APK 大小")
                     if package_name != OFFICIAL_PACKAGE_NAME:

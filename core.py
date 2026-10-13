@@ -1,4 +1,4 @@
-"""Shared foundational helpers for the My Changli local backend.
+"""Shared foundational helpers for the MyChuannong local backend.
 
 This module intentionally contains only stable, low-risk utilities used by
 ``server.py``: error model, time handling, SQLite connection lifecycle,
@@ -42,8 +42,12 @@ def configure_test_runtime(database_path: Path) -> None:
     """
     global DB_PATH
     resolved = database_path.resolve()
-    default = (ROOT / "data" / "my-chuannong.db").resolve()
-    if resolved == default:
+    protected = {
+        (ROOT / "data" / "my-chuannong.db").resolve(),
+        (ROOT / "data" / "my-chuannong-v105.db").resolve(),
+        RUNTIME.database_path.resolve(),
+    }
+    if resolved in protected:
         raise RuntimeError("Refusing to point the test runtime at the local development database")
     DB_PATH = resolved
 

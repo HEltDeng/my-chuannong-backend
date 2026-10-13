@@ -23,3 +23,17 @@ logs/
 !credentials.example.json
 
 uploads/
+
+# Operational state, private signing material and exports never belong in Git.
+backups/
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+*.key
+*.p12
+*.pfx
+*.pem
+*.hprof
+*.docx
+*.doc
