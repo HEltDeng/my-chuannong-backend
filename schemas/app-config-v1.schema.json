@@ -69,7 +69,28 @@
         "actionId": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 64
+          "maxLength": 64,
+          "enum": [
+            "cet",
+            "civil_postgrad",
+            "comprehensive_score",
+            "document",
+            "driving_school",
+            "electric",
+            "errand",
+            "exam",
+            "grade",
+            "gym",
+            "holiday_destination",
+            "ielts_toefl",
+            "logistics_repair",
+            "lost_found",
+            "mandarin",
+            "ncre",
+            "schedule",
+            "secondhand",
+            "weekly_attendance"
+          ]
         },
         "title": {
           "type": "string",
@@ -79,7 +100,26 @@
         "iconKey": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 64
+          "maxLength": 64,
+          "enum": [
+            "abc",
+            "assessment",
+            "build",
+            "calendar",
+            "computer",
+            "directions_car",
+            "electric",
+            "event_note",
+            "find_in_page",
+            "fitness_center",
+            "folder",
+            "how_to_reg",
+            "local_shipping",
+            "luggage",
+            "menu_book",
+            "record_voice_over",
+            "shopping_bag"
+          ]
         },
         "order": {
           "type": "integer",
@@ -89,6 +129,7 @@
           "enum": [
             "learning",
             "life",
+            "off_campus",
             "primary",
             "secondary"
           ]

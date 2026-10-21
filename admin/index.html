@@ -3,8 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>我的川农 · 内部预览管理后台</title>
+  <link rel="icon" href="/admin/assets/my-chuannong-app-icon.png">
+  <title>我的川农 · 校园运营后台</title>
   <link rel="stylesheet" href="/admin/styles.css">
+  <link rel="stylesheet" href="/admin/marketplace.css">
 </head>
 <body>
   <div id="toast" class="toast" aria-live="polite"></div>
@@ -13,8 +15,8 @@
     <section class="login-card">
       <img class="brand-mark" src="/admin/assets/my-chuannong-app-icon.png" alt="我的川农">
       <p class="eyebrow">MY CHUANNONG</p>
-      <h1>内部预览管理后台</h1>
-      <p class="muted">仅用于我的川农独立后台；当前版本尚未部署公网服务。</p>
+      <h1>校园运营后台</h1>
+      <p class="muted">管理校园内容，连接川农日常。</p>
       <form id="login-form" class="stack">
         <label>管理员用户名<input id="login-username" autocomplete="username" required></label>
         <label>密码<input id="login-password" type="password" autocomplete="current-password" required></label>
@@ -26,23 +28,23 @@
 
   <div id="app-view" class="app-shell hidden">
     <aside class="sidebar">
-      <div class="brand-row"><img class="brand-mark small" src="/admin/assets/my-chuannong-app-icon.png" alt="我的川农"><div><strong>我的川农</strong><span>内部预览管理后台</span></div></div>
+      <div class="brand-row"><img class="brand-mark small" src="/admin/assets/my-chuannong-app-icon.png" alt="我的川农"><div><strong>我的川农</strong><span>校园运营后台</span></div></div>
       <nav id="nav">
         <span class="nav-group">概览</span>
         <button data-page="overview" class="active" data-roles="SUPER_ADMIN SPORTS_OPERATOR LOST_FOUND_OPERATOR LIBRARY_OPERATOR CONTENT_OPERATOR">工作台概览</button>
-        <span class="nav-group">体育预约</span>
-        <button data-page="venues" data-roles="SUPER_ADMIN SPORTS_OPERATOR">场地与库存</button>
-        <button data-page="reservations" data-roles="SUPER_ADMIN SPORTS_OPERATOR">预约记录</button>
-        <button data-page="rules" data-roles="SUPER_ADMIN SPORTS_OPERATOR">预约规则</button>
-        <span class="nav-group">失物招领</span>
-        <button data-page="lost" data-roles="SUPER_ADMIN LOST_FOUND_OPERATOR">失物处理</button>
-        <button data-page="lostReports" data-roles="SUPER_ADMIN LOST_FOUND_OPERATOR">举报处理</button>
+        <span class="nav-group">校园生活</span>
+        <button data-page="marketplace" data-roles="SUPER_ADMIN CONTENT_OPERATOR">二手好物</button>
+        <button data-page="communityLost" data-roles="SUPER_ADMIN LOST_FOUND_OPERATOR">失物招领</button>
+        <span class="nav-group">校外园地</span>
+        <button data-page="providers" data-roles="SUPER_ADMIN CONTENT_OPERATOR">机构与课程</button>
+        <button data-page="bookings" data-roles="SUPER_ADMIN CONTENT_OPERATOR">预约管理</button>
+        <button data-page="guides" data-roles="SUPER_ADMIN CONTENT_OPERATOR">校园服务指南</button>
         <span class="nav-group">资料库</span>
         <button data-page="resources" data-roles="SUPER_ADMIN LIBRARY_OPERATOR">资料管理</button>
         <button data-page="resourceComplaints" data-roles="SUPER_ADMIN LIBRARY_OPERATOR">资料投诉 / 举报处理</button>
         <span class="nav-group">内容运营</span>
         <button data-page="announcements" data-roles="SUPER_ADMIN CONTENT_OPERATOR">APP 公告</button>
-        <button data-page="websiteAnnouncements" data-roles="SUPER_ADMIN CONTENT_OPERATOR">网站公告</button>
+        <button data-page="catalogue" data-roles="SUPER_ADMIN">APP 功能对照</button>
         <button data-page="config" data-roles="SUPER_ADMIN">版本与功能开关</button>
         <span class="nav-group">平台管理</span>
         <button data-page="users" data-roles="SUPER_ADMIN">用户与权限</button>
@@ -57,8 +59,8 @@
 
     <section class="workspace">
       <header class="topbar">
-        <div><p class="eyebrow">PRODUCTION ADMIN</p><h2 id="page-title">概览</h2></div>
-        <div><div id="admin-identity" class="muted"></div><div class="local-pill"><span></span>HTTPS</div></div>
+        <div><p class="eyebrow">MY CHUANNONG / CAMPUS CONSOLE</p><h2 id="page-title">概览</h2></div>
+        <div><div id="admin-identity" class="muted"></div><div class="local-pill"><span></span>本地联调</div></div>
       </header>
       <div id="page-content" class="content" aria-live="polite"></div>
     </section>
@@ -74,5 +76,8 @@
     </form>
   </dialog>
   <script src="/admin/app.js"></script>
+  <script src="/admin/campus.js"></script>
+  <script src="/admin/marketplace.js"></script>
+  <script src="/admin/lostfound-review.js"></script>
 </body>
 </html>

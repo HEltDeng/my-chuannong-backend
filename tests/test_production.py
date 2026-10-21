@@ -215,21 +215,34 @@ class ProductionUnitTest(unittest.TestCase):
                 "lost_found_posts",
                 "feedback",
                 "announcements",
+                "venues",
+                "venue_time_slots",
+                "campus_posts",
+                "campus_providers",
+                "campus_bookings",
                 "app_update_policies",
             ):
                 expected = 1 if table == "app_update_policies" else 0
-                self.assertEqual(expected, database.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+                self.assertEqual(expected, database.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0], table)
+            # The three editor slots are required configuration, with no published content.
+            guides = database.execute("SELECT body,image,url,status FROM campus_guides").fetchall()
+            self.assertEqual(3, len(guides))
+            for guide in guides:
+                self.assertFalse(guide["body"] or guide["image"] or guide["url"])
+                self.assertEqual("DRAFT", guide["status"])
             version = database.execute(
-                "SELECT status FROM app_versions WHERE platform='android'"
+                "SELECT status,latest_version_name,latest_version_code FROM app_versions WHERE platform='android'"
             ).fetchone()
             self.assertEqual("DRAFT", version["status"])
+            self.assertEqual("1.0.0", version["latest_version_name"])
+            self.assertEqual(10, version["latest_version_code"])
             policy = database.execute(
                 "SELECT * FROM app_update_policies WHERE platform='android'"
             ).fetchone()
             self.assertEqual(0, policy["update_enabled"])
             self.assertEqual(0, policy["force_update_enabled"])
             self.assertEqual(1, policy["policy_revision"])
-            self.assertEqual(5, database.execute("SELECT COUNT(*) FROM resource_items").fetchone()[0])
+            self.assertEqual(0, database.execute("SELECT COUNT(*) FROM resource_items").fetchone()[0])
 
     def test_consistent_backup_verification_and_restore(self):
         with server.connection() as database:
@@ -854,7 +867,7 @@ class ProductionRuntimeSmokeTest(unittest.TestCase):
                     self.assertEqual(200, response.status)
                     public_bootstrap = json.loads(response.read())
                     self.assertTrue(public_bootstrap["ok"])
-                    self.assertEqual(5, len(public_bootstrap["data"]["flags"]))
+                    self.assertEqual(6, len(public_bootstrap["data"]["flags"]))
 
                 login_status, login = json_request(
                     "/api/v1/auth/login",

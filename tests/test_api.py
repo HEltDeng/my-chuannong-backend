@@ -8,6 +8,8 @@ import secrets
 import tempfile
 import threading
 import unittest
+from unittest import mock
+from synthetic_fixtures import seed_legacy_test_fixtures
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -31,6 +33,10 @@ class ApiTest(unittest.TestCase):
         server.DB_PATH = test_database
         server.UPLOADS = Path(cls.temp.name) / "uploads"
         server.initialize_database()
+        seed_legacy_test_fixtures(server)
+        certificate = mock.patch.object(server, "OFFICIAL_SIGNING_CERTIFICATE_SHA256", "A" * 64)
+        certificate.start()
+        cls.addClassCleanup(certificate.stop)
         cls.httpd = server.ThreadingHTTPServer(("127.0.0.1", 0), server.ApiHandler)
         cls.base = f"http://127.0.0.1:{cls.httpd.server_port}"
         cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
@@ -561,6 +567,37 @@ class ApiTest(unittest.TestCase):
         self.assertTrue(any(
             row["action"] == "ANNOUNCEMENT_DELETED" for row in audits["data"]
         ))
+
+    def test_service_announcement_management(self):
+        admin = self.admin_token()
+        buffer = io.BytesIO()
+        Image.new("RGB", (16, 16), "green").save(buffer, "PNG")
+        payload = {"title":"测试动态", "content":"测试正文", "category":"示例公告", "sortOrder":-100,
+                   "enabled":False, "imageBase64":base64.b64encode(buffer.getvalue()).decode()}
+        status, created = self.call("POST", "/api/v1/admin/announcements", payload, admin)
+        self.assertEqual(201, status)
+        identity = created["data"]["id"]
+        route = "/api/v1/admin/announcements/" + identity
+        def feed():
+            return self.call("GET", "/api/v1/public/service-updates")[1]["data"]
+        self.assertFalse(any(row.get("targetId") == identity for row in feed()))
+        self.assertEqual(200,self.call("PATCH",route,{"enabled":True,"targetUrl":"https://www.sicau.edu.cn/"},admin)[0])
+        row = next(row for row in feed() if row.get("targetId") == identity)
+        self.assertEqual("示例公告",row["category"])
+        self.assertEqual("URL",row["targetType"])
+        self.assertTrue(row["imageUrl"].startswith("/uploads/"))
+        self.assertEqual(-100,row["sortOrder"])
+        self.assertEqual(identity,next(row for row in feed() if row["type"] == "ANNOUNCEMENT")["targetId"])
+        self.assertEqual(400,self.call("PATCH",route,{"targetUrl":"javascript:alert(1)"},admin)[0])
+        self.assertEqual(200,self.call("PATCH",route,{"title":"修改标题","content":"更新正文","targetUrl":"","removeImage":True},admin)[0])
+        row = next(row for row in feed() if row.get("targetId") == identity)
+        self.assertEqual("修改标题",row["title"])
+        self.assertEqual("更新正文",row["summary"])
+        self.assertEqual("ANNOUNCEMENT",row["targetType"])
+        self.assertIsNone(row["imageUrl"])
+        self.assertEqual(200,self.call("PATCH",route,{"enabled":False},admin)[0])
+        self.assertFalse(any(row.get("targetId") == identity for row in feed()))
+        self.assertEqual(200,self.call("DELETE",route,token=admin)[0])
 
     def test_announcement_notification_flags_are_explicit_and_edit_safe(self):
         admin = self.admin_token()
@@ -1565,6 +1602,23 @@ class ApiTest(unittest.TestCase):
         )
 
     def test_service_updates_aggregation_and_visibility(self):
+        # This class shares a synthetic database. Restore flags even if assertions
+        # fail so its maintenance scenario cannot disable later reservation tests.
+        with server.connection() as db:
+            flags_before = [dict(row) for row in db.execute(
+                "SELECT * FROM remote_flags WHERE key IN ('sports_reservation','lost_found','resource_library')"
+            )]
+
+        def restore_flags():
+            with server.connection() as db:
+                for row in flags_before:
+                    db.execute(
+                        "UPDATE remote_flags SET enabled=?,payload_json=?,updated_at=?,updated_by=?,change_note=? WHERE key=?",
+                        (row["enabled"], row["payload_json"], row["updated_at"],
+                         row["updated_by"], row["change_note"], row["key"]),
+                    )
+
+        self.addCleanup(restore_flags)
         self.publish_seed_release_for_version_tests()
         admin = self.admin_token()
         for feature_key in ("sports_reservation", "lost_found", "resource_library"):
@@ -1655,28 +1709,36 @@ class ApiTest(unittest.TestCase):
         self.assertFalse(any(item["title"] == "服务页隐藏公告" for item in items))
         self.assertFalse(any(item["title"] == "撤回公告" for item in items))
 
+        for sports_status in ("CLOSED", "MAINTENANCE"):
+            self.assertEqual(200, self.call(
+                "PUT", "/api/v1/admin/flags/sports_reservation",
+                {"payload": {"status": sports_status}}, admin,
+            )[0])
+            _, updates = self.call("GET", "/api/v1/public/service-updates")
+            self.assertEqual(items, updates["data"])
+
         self.assertEqual(
             200,
             self.call(
                 "PUT",
-                "/api/v1/admin/flags/sports_reservation",
-                {"payload": {"status": "MAINTENANCE", "maintenanceNote": "场馆维护"}},
+                "/api/v1/admin/flags/lost_found",
+                {"payload": {"status": "MAINTENANCE", "maintenanceNote": "失物招领维护"}},
                 admin,
             )[0],
         )
         _, updates = self.call("GET", "/api/v1/public/service-updates")
         maintenance = [item for item in updates["data"] if item["type"] == "MAINTENANCE"]
         self.assertEqual(1, len(maintenance))
-        self.assertEqual("sports_reservation", maintenance[0]["moduleKey"])
-        self.assertEqual("体育预约维护中", maintenance[0]["title"])
+        self.assertEqual("lost_found", maintenance[0]["moduleKey"])
+        self.assertEqual("失物招领维护中", maintenance[0]["title"])
         self.assertEqual("FEATURE", maintenance[0]["targetType"])
-        self.assertEqual("场馆维护", maintenance[0]["summary"])
+        self.assertEqual("失物招领维护", maintenance[0]["summary"])
 
         self.assertEqual(
             200,
             self.call(
                 "PUT",
-                "/api/v1/admin/flags/sports_reservation",
+                "/api/v1/admin/flags/lost_found",
                 {"payload": {"status": "CLOSED", "maintenanceNote": "暂不开放"}},
                 admin,
             )[0],
@@ -1684,7 +1746,7 @@ class ApiTest(unittest.TestCase):
         _, updates = self.call("GET", "/api/v1/public/service-updates")
         closed = [item for item in updates["data"] if item["type"] == "CLOSED"]
         self.assertEqual(1, len(closed))
-        self.assertEqual("sports_reservation", closed[0]["moduleKey"])
+        self.assertEqual("lost_found", closed[0]["moduleKey"])
         self.assertEqual(90, closed[0]["priority"])
         self.assertEqual("FEATURE", closed[0]["targetType"])
         self.assertEqual("暂不开放", closed[0]["summary"])
@@ -1693,7 +1755,7 @@ class ApiTest(unittest.TestCase):
             200,
             self.call(
                 "PUT",
-                "/api/v1/admin/flags/sports_reservation",
+                "/api/v1/admin/flags/lost_found",
                 {"payload": {"status": "OPEN"}},
                 admin,
             )[0],
@@ -2424,7 +2486,7 @@ class ApiTest(unittest.TestCase):
 
     def test_admin_web_assets_are_served_locally(self):
         for path, expected in (
-            ("/admin/", "内部预览管理后台"),
+            ("/admin/", "校园运营后台"),
             ("/admin/styles.css", "--blue"),
             ("/admin/app.js", "sessionStorage"),
         ):
@@ -2434,7 +2496,8 @@ class ApiTest(unittest.TestCase):
 
         with urllib.request.urlopen(self.base + "/admin/", timeout=5) as response:
             html = response.read().decode("utf-8")
-            self.assertIn("PRODUCTION ADMIN", html)
+            self.assertIn("MY CHUANNONG / CAMPUS CONSOLE", html)
+            self.assertIn("本地联调", html)
             self.assertIn("/admin/assets/my-chuannong-app-icon.png", html)
             self.assertNotIn("LOCAL ADMIN", html)
             self.assertNotIn("仅本机", html)

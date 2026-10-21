@@ -1,13 +1,19 @@
 {
   "product": "MyChuannong",
-  "date": "2026-10-13",
-  "branch": "codex/accepted-preview9",
-  "scope": "Audited backend application, admin, schema, dependency and test sources",
-  "hash_rules": "SHA-256 of UTF-8 files with CRLF normalized to LF; binary files unchanged. Documentation and the verifier itself are excluded. This is a baseline for intentional future changes, not a restriction on development.",
+  "version": "1.0.0",
+  "date": "2026-10-21",
+  "branch": "codex/release-1.0.0",
+  "scope": "Frozen source and required resources; no runtime data or signing material",
+  "hash_rules": "SHA-256 of UTF-8 files with CRLF normalized to LF; binary files unchanged. Documentation and the verifier itself are excluded. Intentional future changes may differ.",
   "files": [
     {
+      "path": ".gitignore",
+      "sha256": "6c2a33842c39fb98b336746f4f7ad95320cb09dd47bf919d2c4c821a8cbb37e2",
+      "encoding": "utf-8-lf"
+    },
+    {
       "path": "admin/app.js",
-      "sha256": "268a6755d33edeb1de4c99af4d7e8d92f7e8b3723a8199608627be6eb75d24f5",
+      "sha256": "60449a7ea966e11c330befaae179b27fcf72e3ed0e1608b9f5bf2e2a3a5c5fbd",
       "encoding": "utf-8-lf"
     },
     {
@@ -16,13 +22,48 @@
       "encoding": "binary"
     },
     {
+      "path": "admin/campus.js",
+      "sha256": "e8c81480b0c6ac0176c6a031ed8cbd2f62d1a923fbcb39ee4c46f23b8a406748",
+      "encoding": "utf-8-lf"
+    },
+    {
       "path": "admin/index.html",
-      "sha256": "db2d6f33289381a7b1e113a4e4d56556cf9a68669077d67d5ca6577252065b3f",
+      "sha256": "09e3c80e82c77b42bb1ce547e71cd69701fb97fc2384428dfbfda040a866def8",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "admin/lostfound-review.js",
+      "sha256": "69276ed2d6b2538de329cacbc4b1c9f6da3c96171b9341715d63b3ac513b1577",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "admin/marketplace.css",
+      "sha256": "3fda51f2052146725a5f4dcc73c3aba259966e0d3a629d9ef86d99712dd18b48",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "admin/marketplace.js",
+      "sha256": "1fcc95eeb55c6e10e47806c0b2d2b992422ef2751a66396e9a3979c8c8162331",
       "encoding": "utf-8-lf"
     },
     {
       "path": "admin/styles.css",
-      "sha256": "a73f8c18319b9073929b5675f7b727281f88bdf9a67402de7617c27720ba3ef4",
+      "sha256": "cd42bcecc1072f9ed1e0e82b25ca81586815db8859607459ef593f1782eaf64e",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "app-catalogue.json",
+      "sha256": "b76719d038f676a4e819b2bc85edbffbe2bf4d96f7f1b1b31093067fecdb4817",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "campus_hub.py",
+      "sha256": "a4be16e5d388e385cecabce1a0333137cd663a2dc856e600e3a7202f90bd03f4",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "campus_schema.sql",
+      "sha256": "b0fb82c6b6677bd5aaab1a4462ea845f80254cbb2fec0562b0c54641408637e8",
       "encoding": "utf-8-lf"
     },
     {
@@ -31,8 +72,18 @@
       "encoding": "utf-8-lf"
     },
     {
+      "path": "credentials.example.json",
+      "sha256": "cb2a556ae74f2b4d0bc5ce6723fa52ef82ba142a2234acc755f0ae12e7fe61e0",
+      "encoding": "utf-8-lf"
+    },
+    {
       "path": "logging_config.py",
       "sha256": "2c9ba99d28369873b8ecc5a9c266a5ffc08c5045e1080e070cfa6df5245b92f7",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "lostfound_review.py",
+      "sha256": "19ec58a317c7dcf99fa3a4d18161f9ed980352b2b8a1f5097e66b356ac6adab4",
       "encoding": "utf-8-lf"
     },
     {
@@ -41,8 +92,18 @@
       "encoding": "utf-8-lf"
     },
     {
+      "path": "marketplace.py",
+      "sha256": "488d26d91752b79f4dc45d7686716e41b6aacc91fa337594d9731b4d03dd9ab0",
+      "encoding": "utf-8-lf"
+    },
+    {
       "path": "production.py",
       "sha256": "cca225562be8558ca52c381dd71738170ae953a7f3c613c0c41817d8578dda15",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "80976f1e3eb9078b9cd26d08549cd1f2b31a4f13e39564db7eede45b41229827",
       "encoding": "utf-8-lf"
     },
     {
@@ -57,7 +118,7 @@
     },
     {
       "path": "run_local.py",
-      "sha256": "50e0244ac4f19c02e4220441dc4e7e6ffd1f6fd9506d32cdfb41217e634df46c",
+      "sha256": "893386236c65ee1c3c2631c52d2ba5618cde34e717b55db0ec0f6e0fcdd3c8e3",
       "encoding": "utf-8-lf"
     },
     {
@@ -67,12 +128,27 @@
     },
     {
       "path": "schema.sql",
-      "sha256": "27d5b696905f5cd4136d3e60d2a8374eac016f92fba59680523784ade5ff0974",
+      "sha256": "c1d15fad39a00d318d4db46749beb8546207ed28577428a1a28e67e4ad8dad6f",
       "encoding": "utf-8-lf"
     },
     {
       "path": "schemas/app-config-v1.schema.json",
-      "sha256": "bfa796380a0caeb029935ddfbc59c7b9c6e0be396b43fa8b4865bf6429a982be",
+      "sha256": "03121bb122b42edb52877a91b764d6f76d1afcbbebbd20641d6601b1199e30fd",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "school-public-probes.json",
+      "sha256": "72df43ed8c0788b5e8da779378cf867984b843e27ad79e75784e03ce4c090d97",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "school.json",
+      "sha256": "d23803cda99d961e7e6100408759132ba27da9850683ea79e249749332dc596c",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "scripts/database_tools.py",
+      "sha256": "851410ddeab65b16deb7b8383a27c8d967eba1bb9caec843ad1d259c028308d8",
       "encoding": "utf-8-lf"
     },
     {
@@ -82,17 +158,22 @@
     },
     {
       "path": "server.py",
-      "sha256": "fff1ed1c6272b371b343f6527c7f1f34e09b896ed15fc5dbffe0a096ee5a3247",
+      "sha256": "1d78fb8338ef6ebb14c57a2cc16dd0801f01cb8bd985b8ab5901cc3b3067e7c8",
       "encoding": "utf-8-lf"
     },
     {
       "path": "start-local.ps1",
-      "sha256": "f0d300e09de89390b3f2e64faec87f079caf478e2a628c569e759095754394b3",
+      "sha256": "0b12c1807fa0b95c97da76067fed9f9febb29b97231a00f531f66358f1255631",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "tests/synthetic_fixtures.py",
+      "sha256": "527269553bbefc4903c20e8d0aae89181aeb3382ad3566a5e7aeb987e9980539",
       "encoding": "utf-8-lf"
     },
     {
       "path": "tests/test_api.py",
-      "sha256": "830f9eea74118681a4ccfacf81bdc2eb759159e27eaecadb2c7c056349ab7b9f",
+      "sha256": "573d6e038eb9d183b7035db538900142ec09df014fd63c5ba81280bf0a2f9092",
       "encoding": "utf-8-lf"
     },
     {
@@ -101,8 +182,43 @@
       "encoding": "utf-8-lf"
     },
     {
+      "path": "tests/test_campus_hub.py",
+      "sha256": "db9b2351f6fc7c82f82fa27251469e681895e18d7182768f51d668be76322c28",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "tests/test_lostfound_review.py",
+      "sha256": "faab00b29376cbec4a716ac3d1d707a3d2fa1c487acb9564d2cdd28c56f738b8",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "tests/test_marketplace_review.py",
+      "sha256": "a4093250e7ab8e7773997e4536dd98d3b9b33aa369ad6c4677e51c12d8a92e62",
+      "encoding": "utf-8-lf"
+    },
+    {
       "path": "tests/test_production.py",
-      "sha256": "7c5500240d93070db3a06d1201698ca36b33440534bd5d0c91dd30734d81becc",
+      "sha256": "ec2566cef5e187f1fb3c305de33f0dbdaf8ee212409eb16f1b87c926ec1e730c",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "validation/backend-tests.json",
+      "sha256": "925ae84ce3f47825e9d554ff52aef1d2a54fc89929ddb1fbb9a5b5c0538a4288",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "validation/config-emulator.json",
+      "sha256": "f07de72ec8ee7bf7f8f8e01b8e92684cfbebc1fec842e39b43b398c3e56ff1a0",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "validation/install-isolation.json",
+      "sha256": "f50c40fbad331dc10e2a1ae641d403b43b0b18cbae6d6300eee3490e7a321bce",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "validation/offline-pages.json",
+      "sha256": "9d84c9e7dd46e107f0d7d2593127cdd88909004472c178269ebd7294fcb51f2a",
       "encoding": "utf-8-lf"
     },
     {

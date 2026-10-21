@@ -1,3 +1,27 @@
+
+function announcementFields(row = {}) {
+  return `<label>分类 / 标签<input name="category" maxlength="30" value="${escapeHtml(row.category || "公告")}"></label>
+    <label>显示顺序（越小越靠前）<input name="sortOrder" type="number" min="-100000" max="100000" value="${Number(row.sort_order || 0)}"></label>
+    <label>跳转链接（留空打开公告详情）<input name="targetUrl" type="url" placeholder="https://" value="${escapeHtml(row.target_url || "")}"></label>
+    ${row.image_name ? `<img alt="公告图片" style="max-width:240px;max-height:160px" src="/uploads/${encodeURIComponent(row.image_name)}">` : ""}
+    <label>上传 / 替换图片（JPEG、PNG、WebP，最多3MB）<input name="announcementImage" type="file" accept="image/jpeg,image/png,image/webp"></label>
+    <label class="checkbox-row"><input name="removeImage" type="checkbox">移除现有图片</label>`;
+}
+async function announcementMetadata(data) {
+  const result = {category: data.get("category"), sortOrder: Number(data.get("sortOrder") || 0), targetUrl: data.get("targetUrl"), removeImage: data.has("removeImage")};
+  const file = data.get("announcementImage");
+  if (file?.size) {
+    if (file.size > 3 * 1024 * 1024) throw new Error("图片不能超过3MB");
+    result.imageBase64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(",")[1]);
+      reader.onerror = () => reject(new Error("图片读取失败，请重试"));
+      reader.readAsDataURL(file);
+    });
+  }
+  return result;
+}
+let announcementRows = [];
 const state = {
   token: sessionStorage.getItem("myChuannongAdminToken") || "",
   page: "overview",
@@ -707,10 +731,12 @@ const renderers = {
 
   async announcements() {
     const rows = await api("/api/v1/admin/announcements");
+    announcementRows = rows;
     content.innerHTML = `
       <article class="card">
         <h3>发布新公告</h3>
         <form id="announcement-form" class="stack">
+          ${announcementFields()}
           <label>标题<input name="title" maxlength="100" required></label>
           <label>内容<textarea name="content" maxlength="4000" required></textarea></label>
           <label class="checkbox-row"><input type="checkbox" name="enabled" checked> 发布后立即在 App 配置接口中可见</label>
@@ -810,9 +836,9 @@ const renderers = {
           <h3>功能开放与维护</h3>
           <p class="muted">关闭或维护时，App 仍保留入口，并向用户显示这里填写的说明。</p>
           <div class="stack">
-            ${data.flags.filter((flag) => ["sports_reservation","lost_found","resource_library"].includes(flag.key)).map((flag) => `
+            ${data.flags.filter((flag) => ["secondhand","lost_found","resource_library"].includes(flag.key)).map((flag) => `
               <form class="feature-form sub-card" data-key="${escapeHtml(flag.key)}">
-                <div class="card-header"><strong>${flag.key === "sports_reservation" ? "体育预约" : flag.key === "lost_found" ? "失物招领" : "资料库"}</strong>${badge(flag.payload?.status || (flag.enabled ? "OPEN" : "CLOSED"))}</div>
+                <div class="card-header"><strong>${flag.key === "secondhand" ? "二手好物" : flag.key === "lost_found" ? "失物招领" : "资料库"}</strong>${badge(flag.payload?.status || (flag.enabled ? "OPEN" : "CLOSED"))}</div>
                 <label>运行状态<select name="status">${options(["OPEN","CLOSED","MAINTENANCE"], flag.payload?.status || (flag.enabled ? "OPEN" : "CLOSED"))}</select></label>
                 <label>用户提示<textarea name="maintenanceNote" placeholder="例如：场馆规则调整中，预计今晚恢复">${escapeHtml(flag.payload?.maintenanceNote || "")}</textarea></label>
                 <label>预计恢复时间（可留空）<input type="datetime-local" name="expectedRestoreAt" value="${datetimeLocal(flag.payload?.expectedRestoreAt)}"></label>
@@ -1123,10 +1149,12 @@ content.addEventListener("submit", async (event) => {
       return renderers.config();
     }
     if (form.id === "announcement-form") {
+      const metadata = await announcementMetadata(new FormData(form));
       await api("/api/v1/admin/announcements", {
         method: "POST",
         body: {
           ...values,
+          ...metadata,
           enabled: form.enabled.checked,
           serviceVisible: form.serviceVisible.checked,
           notificationEnabled: form.notificationEnabled.checked,
@@ -1667,17 +1695,19 @@ content.addEventListener("click", async (event) => {
       return renderers.announcements();
     }
     if (action === "edit-announcement") {
-      return openDialog("编辑公告", `<div class="stack"><label>标题<input name="title" value="${escapeHtml(button.dataset.title)}" required></label><label>内容<textarea name="content" required>${escapeHtml(button.dataset.content)}</textarea></label><label class="checkbox-row"><input type="checkbox" name="serviceVisible" ${button.dataset.serviceVisible === "true" ? "checked" : ""}> 显示在 App 服务页“服务动态”</label><label class="checkbox-row"><input type="checkbox" name="notificationEnabled" ${button.dataset.notificationEnabled === "true" ? "checked" : ""}> 发送系统通知（App 同步后提醒）</label><label class="checkbox-row"><input type="checkbox" name="popupEnabled" ${button.dataset.popupEnabled === "true" ? "checked" : ""}> 首次获取时显示 App 内弹窗</label><p class="muted">编辑不会因为公告 ID 不变而自动重新通知已经处理过的设备。</p></div>`,
+      const row = announcementRows.find(item => item.id === button.dataset.id) || {};
+      return openDialog("编辑公告", `<div class="stack">${announcementFields(row)}<label>标题<input name="title" value="${escapeHtml(button.dataset.title)}" required></label><label>内容<textarea name="content" required>${escapeHtml(button.dataset.content)}</textarea></label><label class="checkbox-row"><input type="checkbox" name="serviceVisible" ${button.dataset.serviceVisible === "true" ? "checked" : ""}> 显示在 App 服务页“服务动态”</label><label class="checkbox-row"><input type="checkbox" name="notificationEnabled" ${button.dataset.notificationEnabled === "true" ? "checked" : ""}> 发送系统通知（App 同步后提醒）</label><label class="checkbox-row"><input type="checkbox" name="popupEnabled" ${button.dataset.popupEnabled === "true" ? "checked" : ""}> 首次获取时显示 App 内弹窗</label><p class="muted">编辑不会因为公告 ID 不变而自动重新通知已经处理过的设备。</p></div>`,
         async (form) => {
           await api(`/api/v1/admin/announcements/${encodeURIComponent(button.dataset.id)}`, {
             method: "PATCH",
             body: {
+              ...await announcementMetadata(form),
               title: form.get("title"),
               content: form.get("content"),
               enabled: button.dataset.enabled === "true",
-              serviceVisible: form.serviceVisible.checked,
-              notificationEnabled: form.notificationEnabled.checked,
-              popupEnabled: form.popupEnabled.checked,
+              serviceVisible: form.has("serviceVisible"),
+              notificationEnabled: form.has("notificationEnabled"),
+              popupEnabled: form.has("popupEnabled"),
             },
           });
           toast("公告已更新");
@@ -1785,5 +1815,4 @@ $("#dialog-content").addEventListener("click", async (event) => {
   }
 });
 
-if (state.token) showApp();
-else showLogin();
+window.addEventListener("DOMContentLoaded", () => { if (state.token) showApp(); else showLogin(); });

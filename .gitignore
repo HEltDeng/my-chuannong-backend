@@ -37,3 +37,10 @@ backups/
 *.hprof
 *.docx
 *.doc
+
+.runtime-deps/
+
+# Local delivery output and process state.
+/05_Output/
+*.pid
+*.tsbuildinfo

@@ -51,6 +51,7 @@ from core import (
 )
 from runtime_config import RUNTIME
 from security import RateLimiter
+import campus_hub
 
 ROOT = Path(__file__).resolve().parent
 UPLOADS = RUNTIME.upload_path
@@ -93,7 +94,7 @@ ROLE_PERMISSIONS = {
     "LIBRARY_OPERATOR": {"LIBRARY_VIEW", "LIBRARY_MANAGE", "LIBRARY_PII_VIEW"},
     "CONTENT_OPERATOR": {"CONTENT_VIEW", "CONTENT_MANAGE"},
 }
-CONTROLLED_FEATURES = {"sports_reservation", "lost_found", "resource_library"}
+CONTROLLED_FEATURES = {"sports_reservation", "lost_found", "resource_library", "secondhand"}
 DEFAULT_DEVICE_NICKNAME = "川农同学"
 OFFICIAL_PACKAGE_NAME = "com.mychuannong.app"
 # No inherited signing identity. Publishing requires an explicitly configured
@@ -112,6 +113,9 @@ APP_CONFIG_MAX_CARDS = 50
 APP_CONFIG_MAX_REMOTE_PAGES = 30
 APP_CONFIG_MAX_RESOURCES = 200
 APP_CONFIG_NATIVE_ACTIONS = {
+    "errand", "logistics_repair", "ncre", "comprehensive_score", "weekly_attendance", "holiday_destination",
+    "secondhand",
+    "driving_school", "ielts_toefl", "civil_postgrad", "gym",
     "schedule",
     "grade",
     "classroom",
@@ -127,6 +131,9 @@ APP_CONFIG_NATIVE_ACTIONS = {
     "official_web",
 }
 APP_CONFIG_ICON_KEYS = {
+    "local_shipping", "build", "computer", "how_to_reg", "luggage",
+    "shopping_bag",
+    "directions_car", "fitness_center", "menu_book", "abc",
     "calendar",
     "assessment",
     "meeting_room",
@@ -140,7 +147,7 @@ APP_CONFIG_ICON_KEYS = {
     "record_voice_over",
     "globe",
 }
-APP_CONFIG_SECTIONS = {"learning", "life", "primary", "secondary"}
+APP_CONFIG_SECTIONS = {"learning", "life", "off_campus", "primary", "secondary"}
 APP_CONFIG_FEATURE_KEYS = {
     "lost_found",
     "resource_library",
@@ -836,39 +843,8 @@ def update_decision(
 
 
 def default_app_config() -> dict[str, Any]:
-    """Return the V1.0.4-equivalent dynamic catalogue used for Config V1."""
-
-    navigation = [
-        ("schedule", "schedule", "课表", "calendar", 10, "learning", None, None),
-        ("grade", "grade", "成绩查询", "assessment", 20, "learning", None, None),
-        ("classroom", "classroom", "空教室", "meeting_room", 30, "learning", None, None),
-        ("homework", "homework", "作业", "assignment", 40, "learning", None, None),
-        ("electric", "electric", "电费查询", "electric", 50, "life", None, None),
-        ("exam", "exam", "考试安排", "event_note", 60, "learning", None, None),
-        ("cet", "cet", "四六级", "language", 70, "learning", None, None),
-        ("lost_found", "lost_found", "失物招领", "find_in_page", 80, "life", "lost_found", None),
-        ("document", "document", "资料库", "folder", 90, "learning", "resource_library", None),
-        ("mandarin", "mandarin", "普通话测试", "record_voice_over", 100, "learning", None, None),
-    ]
-    return {
-        "navigation": [
-            {
-                "id": item_id,
-                "actionId": action_id,
-                "title": title,
-                "iconKey": icon_key,
-                "order": order,
-                "section": section,
-                "visible": True,
-                "featureKey": feature_key,
-                "url": url,
-            }
-            for item_id, action_id, title, icon_key, order, section, feature_key, url in navigation
-        ],
-        "cards": [],
-        "remotePages": [],
-        "resources": [],
-    }
+    """Versioned catalogue aligned with the current Android built-in navigation."""
+    return json.loads((ROOT / "app-catalogue.json").read_text(encoding="utf-8"))
 
 
 def canonical_app_config_json(config: dict[str, Any]) -> str:
@@ -1160,6 +1136,7 @@ def initialize_database() -> None:
         if str(journal_mode).lower() != "wal":
             raise RuntimeError("SQLite WAL mode could not be enabled")
         db.executescript((ROOT / "schema.sql").read_text(encoding="utf-8"))
+        campus_hub.initialize(db)
         ensure_default_app_config(db)
         ensure_column(db, "venues", "operating_status", "TEXT NOT NULL DEFAULT 'OPEN'")
         ensure_column(db, "venues", "maintenance_note", "TEXT NOT NULL DEFAULT ''")
@@ -1221,6 +1198,10 @@ def initialize_database() -> None:
         ensure_column(db, "remote_flags", "updated_by", "TEXT")
         ensure_column(db, "remote_flags", "change_note", "TEXT NOT NULL DEFAULT ''")
         ensure_column(db, "announcements", "service_visible", "INTEGER NOT NULL DEFAULT 1")
+        ensure_column(db, "announcements", "category", "TEXT NOT NULL DEFAULT '公告'")
+        ensure_column(db, "announcements", "sort_order", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(db, "announcements", "image_name", "TEXT")
+        ensure_column(db, "announcements", "target_url", "TEXT")
         ensure_column(db, "announcements", "notification_enabled", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(db, "announcements", "popup_enabled", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(db, "reservations", "refund_status", "TEXT NOT NULL DEFAULT 'NOT_APPLICABLE'")
@@ -1374,29 +1355,10 @@ def initialize_database() -> None:
                 ),
             )
         timestamp = now_ms()
-        venues = [] # No school facilities or operating data are inherited.
-        slots = [
-            ("08:00", "09:00"), ("09:00", "10:00"), ("10:00", "11:00"),
-            ("14:00", "15:00"), ("15:00", "16:00"), ("16:00", "17:00"),
-            ("19:00", "20:00"), ("20:00", "21:00"),
-        ]
-        for venue_id, sport, name, unit, count, price in venues:
-            db.execute(
-                """INSERT INTO venues(id,sport,name,unit_label,court_count,price_yuan,updated_at)
-                   VALUES(?,?,?,?,?,?,?)
-                   ON CONFLICT(id) DO NOTHING""",
-                (venue_id, sport, name, unit, count, price, timestamp),
-            )
-            for start, end in slots:
-                db.execute(
-                    """INSERT INTO venue_time_slots(id,venue_id,start_time,end_time)
-                       VALUES(?,?,?,?) ON CONFLICT(venue_id,start_time,end_time) DO NOTHING""",
-                    (f"{venue_id}-{start}", venue_id, start, end),
-                )
         db.execute(
             """INSERT INTO app_versions(platform,latest_version_code,minimum_version_code,
                        latest_version_name,update_message,created_at,updated_at)
-               VALUES('android',2,1,'0.1.0-preview.2','内部预览，未正式发布',?,?)
+               VALUES('android',10,1,'1.0.0','1.0.0，待配置正式安装包',?,?)
                ON CONFLICT(platform) DO NOTHING""",
             (timestamp, timestamp),
         )
@@ -1412,6 +1374,7 @@ def initialize_database() -> None:
         for key, enabled in (
             ("sports_reservation", 0),
             ("lost_found", 1),
+            ("secondhand", 1),
             ("resource_library", 1),
             ("campus_channel", 0),
             ("buddy_club", 0),
@@ -2136,10 +2099,6 @@ def validate_external_url(value: Any, *, required: bool = True) -> str | None:
     return url
 
 
-def seed_resources(db, timestamp):
-    return # Intentionally empty for the new school, management capability retained.
-
-
 def device_username(installation_id: str) -> str:
     return "device_" + hashlib.sha256(installation_id.encode()).hexdigest()[:32]
 
@@ -2527,6 +2486,17 @@ def delete_user_account_data(
     ]
 
     # Remove user-authored content and user-specific interaction records.
+    for row in db.execute("SELECT payload_json FROM campus_posts WHERE owner_id=?", (user_id,)):
+        payload = json.loads(row["payload_json"])
+        for image in [payload.get("image", ""), *payload.get("images", [])]:
+            if re.fullmatch(r"/uploads/[0-9a-f-]+\.(?:png|jpg|webp)", image):
+                image_names.append(image.rsplit("/", 1)[1])
+    db.execute("DELETE FROM campus_posts WHERE owner_id=?", (user_id,))
+    db.execute("DELETE FROM campus_bookings WHERE owner_id=?", (user_id,))
+    db.execute("DELETE FROM marketplace_notifications WHERE owner_id=?", (user_id,))
+    db.execute("DELETE FROM marketplace_deleted_posts WHERE owner_id=?", (user_id,))
+    db.execute("DELETE FROM lostfound_review_notifications WHERE owner_id=?", (user_id,))
+    db.execute("DELETE FROM lostfound_review_deleted_posts WHERE owner_id=?", (user_id,))
     db.execute("DELETE FROM feedback WHERE user_id=?", (user_id,))
     db.execute("DELETE FROM lost_found_posts WHERE owner_user_id=?", (user_id,))
     db.execute("DELETE FROM lost_found_favorites WHERE user_id=?", (user_id,))
@@ -3115,7 +3085,7 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def send_admin_asset(self, path: str) -> None:
         relative = "index.html" if path in {"/admin", "/admin/"} else path.removeprefix("/admin/")
-        allowed_assets = {"index.html", "app.js", "styles.css", "assets/my-chuannong-app-icon.png"}
+        allowed_assets = {"index.html", "app.js", "campus.js", "marketplace.js", "lostfound-review.js", "marketplace.css", "styles.css", "assets/my-chuannong-app-icon.png"}
         if relative not in allowed_assets:
             raise ApiError(404, "NOT_FOUND", "管理后台资源不存在")
         target = (ADMIN_WEB / relative).resolve()
@@ -3162,6 +3132,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         }[target.suffix]
         self._response_status = 200
         self.send_response(200)
+        self.send_header("X-Product-Id", "my-chuannong")
+        self.send_header("X-Application-Id", "com.mychuannong.app")
         self.send_header("Content-Type", media_type)
         self.send_header("Content-Length", str(len(content)))
         self.send_header("Cache-Control", "private, max-age=3600")
@@ -3172,6 +3144,10 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.wfile.write(content)
 
     def route(self, method: str, path: str, query: dict[str, str]) -> tuple[Any, int]:
+        if path.startswith(("/api/v1/community/", "/api/v1/services/", "/api/v1/admin/campus/")):
+            return campus_hub.route(self, method, path, query, globals())
+        if "campus-activit" in path or "campus_activit" in path:
+            raise ApiError(410, "FEATURE_REMOVED", "校园活动发布已移除")
         if method == "GET" and path == "/health":
             return {"status": "ok"}, 200
         if method == "GET" and path == "/ready":
@@ -4629,6 +4605,35 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "requestTimestamp": request_timestamp,
             }
 
+    def update_announcement_metadata(self, db, announcement_id, data):
+        current = db.execute("SELECT * FROM announcements WHERE id=?", (announcement_id,)).fetchone()
+        category = str(data.get("category", current["category"]) or "公告").strip()
+        if len(category) > 30:
+            raise ApiError(400, "VALIDATION_ERROR", "分类不能超过30字")
+        try:
+            sort_order = int(data.get("sortOrder", current["sort_order"]))
+        except (TypeError, ValueError):
+            raise ApiError(400, "VALIDATION_ERROR", "排序必须为整数")
+        if not -100000 <= sort_order <= 100000:
+            raise ApiError(400, "VALIDATION_ERROR", "排序超出范围")
+        target = str(data.get("targetUrl", current["target_url"]) or "").strip()
+        if target:
+            from urllib.parse import urlsplit
+            try:
+                parsed = urlsplit(target)
+                valid = parsed.scheme == "https" and parsed.hostname and not parsed.username and not parsed.password and parsed.port in (None, 443)
+            except ValueError:
+                valid = False
+            if not valid or len(target) > 2000 or any(ord(c) <= 32 for c in target) or "\\" in target:
+                raise ApiError(400, "VALIDATION_ERROR", "跳转链接须为有效的 HTTPS 地址")
+        image_name = current["image_name"]
+        if data.get("removeImage"):
+            image_name = None
+        if data.get("imageBase64"):
+            image_name = self.save_image(data["imageBase64"], str(uuid.uuid4()))
+        db.execute("UPDATE announcements SET category=?,sort_order=?,target_url=?,image_name=? WHERE id=?",
+                   (category, sort_order, target or None, image_name, announcement_id))
+
     def public_service_updates(self) -> list[dict[str, Any]]:
         """Aggregate user-facing service dynamics for the App service page.
 
@@ -4677,8 +4682,9 @@ class ApiHandler(BaseHTTPRequestHandler):
                     }
                 )
 
+            # Sports reservation is not offered in this App; do not advertise
+            # its inherited CLOSED/MAINTENANCE flag in the service feed.
             feature_labels = {
-                "sports_reservation": "体育预约",
                 "lost_found": "失物招领",
                 "resource_library": "资料库",
             }
@@ -4727,9 +4733,9 @@ class ApiHandler(BaseHTTPRequestHandler):
                     )
 
             announcements = db.execute(
-                """SELECT id,title,content,published_at FROM announcements
+                """SELECT * FROM announcements
                    WHERE enabled=1 AND service_visible=1
-                   ORDER BY published_at DESC LIMIT 5"""
+                   ORDER BY sort_order ASC, published_at DESC LIMIT 50"""
             ).fetchall()
             for announcement in announcements:
                 items.append(
@@ -4739,7 +4745,11 @@ class ApiHandler(BaseHTTPRequestHandler):
                         "priority": 60,
                         "title": announcement["title"],
                         "summary": announcement["content"],
-                        "targetType": "ANNOUNCEMENT",
+                        "category": announcement["category"],
+                        "imageUrl": f"/uploads/{announcement['image_name']}" if announcement["image_name"] else None,
+                        "targetUrl": announcement["target_url"],
+                        "sortOrder": announcement["sort_order"],
+                        "targetType": "URL" if announcement["target_url"] else "ANNOUNCEMENT",
                         "targetId": announcement["id"],
                         "versionCode": None,
                         "versionName": None,
@@ -4756,6 +4766,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             items,
             key=lambda item: (
                 -int(item["priority"]),
+                int(item.get("sortOrder", 0)),
                 -int(item["publishedAt"] or 0),
                 item["id"],
             ),
@@ -6705,7 +6716,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                         "popupEnabled": bool(row["popup_enabled"]),
                     }
                     for row in db.execute(
-                        "SELECT * FROM announcements ORDER BY published_at DESC"
+                        "SELECT * FROM announcements ORDER BY sort_order ASC, published_at DESC"
                     )
                 ], 200
 
@@ -6825,6 +6836,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                         timestamp,
                     ),
                 )
+                self.update_announcement_metadata(db, announcement_id, data)
                 write_audit(
                     db,
                     admin["id"],
@@ -6889,6 +6901,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                         current["id"],
                     ),
                 )
+                self.update_announcement_metadata(db, current["id"], data)
                 write_audit(
                     db,
                     admin["id"],
