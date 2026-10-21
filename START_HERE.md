@@ -22,4 +22,4 @@ python tools/verify_checkout.py
 
 正式部署使用独立 HTTPS 地址、生产环境配置和原正式签名公开指纹，不复用 Debug 配置。SQLite、uploads、backups、日志和凭据另行保管迁移，不能上传源码仓库。不要清空已有用户数据库来获得空白环境。
 
-配套客户端：[Android 1.0.0](https://github.com/HEltDeng/my-chuannong-android/tree/codex/release-1.0.0)。本轮只交付源码，不生成 APK/JKS，不部署公网。
+配套客户端：[Android 1.0.0](https://github.com/HEltDeng/my-chuannong-android/tree/codex/release-1.0.0)。本仓库仅同步源码，不包含本机运营数据，不部署公网。客户端 APK 需原签名构建，目前等待原 JKS 的本地位置。

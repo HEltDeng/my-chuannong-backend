@@ -27,8 +27,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
-from urllib import error as urllib_error
-from urllib import request as urllib_request
+from release_artifact import MAX_APK_BYTES, verify as verify_public_release_artifact
 from cryptography.fernet import Fernet, InvalidToken
 from PIL import Image, UnidentifiedImageError
 from core import (
@@ -2875,27 +2874,7 @@ def verify_release_artifact(
     """Verify the exact published bytes before a production version is saved."""
     if not RUNTIME.is_production:
         return
-    request = urllib_request.Request(
-        download_url,
-        headers={"User-Agent": "MyChuannong-ReleaseGate/1.0"},
-    )
-    digest = hashlib.sha256()
-    size = 0
-    try:
-        with urllib_request.urlopen(request, timeout=30) as response:
-            while True:
-                chunk = response.read(1024 * 1024)
-                if not chunk:
-                    break
-                digest.update(chunk)
-                size += len(chunk)
-    except (urllib_error.URLError, TimeoutError, OSError) as exc:
-        raise ApiError(409, "APK_DOWNLOAD_UNAVAILABLE", "下载地址当前无法完成发布校验") from exc
-    actual_sha256 = digest.hexdigest()
-    if size != expected_size:
-        raise ApiError(409, "APK_SIZE_MISMATCH", "下载文件大小与发布元数据不一致")
-    if actual_sha256 != expected_sha256:
-        raise ApiError(409, "APK_SHA256_MISMATCH", "下载文件 SHA-256 与发布元数据不一致")
+    verify_public_release_artifact(download_url, expected_sha256, expected_size)
 
 
 class ApiHandler(BaseHTTPRequestHandler):
@@ -7387,8 +7366,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                         raise ApiError(400, "INVALID_APK_SIZE", "APK 大小必须为整数") from exc
                 else:
                     apk_size = None
-                if apk_size is not None and apk_size <= 0:
-                    raise ApiError(400, "INVALID_APK_SIZE", "APK 大小必须大于 0")
+                if apk_size is not None and not 0 < apk_size <= MAX_APK_BYTES:
+                    raise ApiError(400, "INVALID_APK_SIZE", "APK 大小必须在 1 字节至 512 MiB 之间")
                 package_name = str(data.get("packageName", "")).strip()[:200] or None
                 certificate = str(data.get("signingCertificateSha256", "")).strip().upper() or None
                 metadata_verified = parse_boolean(

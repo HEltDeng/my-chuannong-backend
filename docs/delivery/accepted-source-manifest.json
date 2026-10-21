@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "date": "2026-10-21",
   "branch": "codex/release-1.0.0",
-  "scope": "Frozen source and required resources; no runtime data or signing material",
+  "scope": "Audited 1.0.0 source and required resources; no runtime data or signing material",
   "hash_rules": "SHA-256 of UTF-8 files with CRLF normalized to LF; binary files unchanged. Documentation and the verifier itself are excluded. Intentional future changes may differ.",
   "files": [
     {
@@ -107,13 +107,18 @@
       "encoding": "utf-8-lf"
     },
     {
+      "path": "release_artifact.py",
+      "sha256": "d02a295b02aa431d8e57155d8f856a6b594c93752a5a6e24f531d3c61cf9841b",
+      "encoding": "utf-8-lf"
+    },
+    {
       "path": "requirements.lock.txt",
-      "sha256": "877bca542c06c6ebd018433198b92b2877901e1b6a2a3e736dc506498a0e73d8",
+      "sha256": "6c552b28028116522fbf737746d570980a584ad6ecb3fd41e8f2c67e5bbc994f",
       "encoding": "utf-8-lf"
     },
     {
       "path": "requirements.txt",
-      "sha256": "90aacc0155c882d8b8577951f42eff3b768b5989ccd2a604943c67a3c275f64f",
+      "sha256": "4d7e30cb0312e9c73f89a2db9a90d063c00fe0fb68edfdc3911c16b91ec04dbe",
       "encoding": "utf-8-lf"
     },
     {
@@ -158,7 +163,7 @@
     },
     {
       "path": "server.py",
-      "sha256": "1d78fb8338ef6ebb14c57a2cc16dd0801f01cb8bd985b8ab5901cc3b3067e7c8",
+      "sha256": "c8d3f2c1a2981ff474de250a77c38431af0cb198023356344454858783f4994e",
       "encoding": "utf-8-lf"
     },
     {
@@ -198,7 +203,12 @@
     },
     {
       "path": "tests/test_production.py",
-      "sha256": "ec2566cef5e187f1fb3c305de33f0dbdaf8ee212409eb16f1b87c926ec1e730c",
+      "sha256": "60c9689be210dccbb2245c2f5527dace0f1b9a0357e916cb73d722faf8771eed",
+      "encoding": "utf-8-lf"
+    },
+    {
+      "path": "tests/test_release_artifact.py",
+      "sha256": "4c5c83c33be377ddfb04334da4a8ceed83ddaca8366682173f48809abe55c614",
       "encoding": "utf-8-lf"
     },
     {
