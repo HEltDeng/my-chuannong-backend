@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/admin/assets/my-chuannong-app-icon.png">
+  <title>我的川农 · 校园运营后台</title>
+  <link rel="stylesheet" href="/admin/styles.css">
+  <link rel="stylesheet" href="/admin/marketplace.css">
+</head>
+<body>
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <main id="login-view" class="login-shell">
+    <section class="login-card">
+      <img class="brand-mark" src="/admin/assets/my-chuannong-app-icon.png" alt="我的川农">
+      <p class="eyebrow">MY CHUANNONG</p>
+      <h1>校园运营后台</h1>
+      <p class="muted">管理校园内容，连接川农日常。</p>
+      <form id="login-form" class="stack">
+        <label>管理员用户名<input id="login-username" autocomplete="username" required></label>
+        <label>密码<input id="login-password" type="password" autocomplete="current-password" required></label>
+        <button class="primary" type="submit">安全登录</button>
+        <p id="login-error" class="error" role="alert"></p>
+      </form>
+    </section>
+  </main>
+
+  <div id="app-view" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="brand-row"><img class="brand-mark small" src="/admin/assets/my-chuannong-app-icon.png" alt="我的川农"><div><strong>我的川农</strong><span>校园运营后台</span></div></div>
+      <nav id="nav">
+        <span class="nav-group">概览</span>
+        <button data-page="overview" class="active" data-roles="SUPER_ADMIN SPORTS_OPERATOR LOST_FOUND_OPERATOR LIBRARY_OPERATOR CONTENT_OPERATOR">工作台概览</button>
+        <span class="nav-group">校园生活</span>
+        <button data-page="marketplace" data-roles="SUPER_ADMIN CONTENT_OPERATOR">二手好物</button>
+        <button data-page="communityLost" data-roles="SUPER_ADMIN LOST_FOUND_OPERATOR">失物招领</button>
+        <span class="nav-group">校外园地</span>
+        <button data-page="providers" data-roles="SUPER_ADMIN CONTENT_OPERATOR">机构与课程</button>
+        <button data-page="bookings" data-roles="SUPER_ADMIN CONTENT_OPERATOR">预约管理</button>
+        <button data-page="guides" data-roles="SUPER_ADMIN CONTENT_OPERATOR">校园服务指南</button>
+        <span class="nav-group">资料库</span>
+        <button data-page="resources" data-roles="SUPER_ADMIN LIBRARY_OPERATOR">资料管理</button>
+        <button data-page="resourceComplaints" data-roles="SUPER_ADMIN LIBRARY_OPERATOR">资料投诉 / 举报处理</button>
+        <span class="nav-group">内容运营</span>
+        <button data-page="announcements" data-roles="SUPER_ADMIN CONTENT_OPERATOR">APP 公告</button>
+        <button data-page="catalogue" data-roles="SUPER_ADMIN">APP 功能对照</button>
+        <button data-page="config" data-roles="SUPER_ADMIN">版本与功能开关</button>
+        <span class="nav-group">平台管理</span>
+        <button data-page="users" data-roles="SUPER_ADMIN">用户与权限</button>
+        <button data-page="admins" data-roles="SUPER_ADMIN">运营管理员</button>
+        <button data-page="riskCandidates" data-roles="SUPER_ADMIN">异常候选</button>
+        <button data-page="userEvents" data-roles="SUPER_ADMIN">用户行为记录</button>
+        <button data-page="feedback" data-roles="SUPER_ADMIN">用户反馈</button>
+        <button data-page="adminAudit" data-roles="SUPER_ADMIN">管理员操作记录</button>
+      </nav>
+      <button id="logout-button" class="ghost logout">退出登录</button>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div><p class="eyebrow">MY CHUANNONG / CAMPUS CONSOLE</p><h2 id="page-title">概览</h2></div>
+        <div><div id="admin-identity" class="muted"></div><div class="local-pill"><span></span>本地联调</div></div>
+      </header>
+      <div id="page-content" class="content" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <dialog id="dialog">
+    <form id="dialog-form" method="dialog">
+      <div id="dialog-content"></div>
+      <div class="dialog-actions">
+        <button type="button" id="dialog-cancel" class="ghost">取消</button>
+        <button id="dialog-confirm" value="default" class="primary">确认</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="/admin/app.js"></script>
+  <script src="/admin/campus.js"></script>
+  <script src="/admin/marketplace.js"></script>
+  <script src="/admin/lostfound-review.js"></script>
+</body>
+</html>

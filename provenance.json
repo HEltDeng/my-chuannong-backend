@@ -1,0 +1,10 @@
+{
+  "productId": "my-chuannong",
+  "schoolId": "sicau",
+  "migration": "full accepted V1.0.5 product restoration",
+  "branch": "codex/restore-v105-adaptation",
+  "androidBaseline": "1d19370dc9a22817b0286372f5f663a3e36ae889",
+  "backendBaseline": "30a1c5fb37e7803ecadb2fd43b5b05c34f61eb37",
+  "privateInternalPreview": true,
+  "schoolParserStatus": "NOT_IMPLEMENTED_PENDING_AUTHENTICATED_PAGE_STRUCTURE"
+}

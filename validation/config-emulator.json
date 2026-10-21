@@ -1,0 +1,15 @@
+{
+  "device": "emulator-5580 / Android 16 API36",
+  "sameApk": true,
+  "apkSha256": "DDC90156AB6F166A3A629EB1822A2CA9CA1795FEABA5F661F2C489B40F764E19",
+  "beforeVersion": 13,
+  "changedVersion": 14,
+  "rollbackVersion": 15,
+  "screenshots": [
+    "config-v1.png",
+    "config-v2.png",
+    "config-rollback.png"
+  ],
+  "result": "PASS_EMULATOR",
+  "realDevice": "PENDING_REAL_DEVICE"
+}

@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mychuannong:app-config:v1",
+  "title": "MyChuannong App Config V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "navigation",
+    "cards",
+    "remotePages",
+    "resources"
+  ],
+  "properties": {
+    "navigation": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/navigation"
+      }
+    },
+    "cards": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "$ref": "#/$defs/card"
+      }
+    },
+    "remotePages": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "$ref": "#/$defs/link"
+      }
+    },
+    "resources": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "$ref": "#/$defs/link"
+      }
+    }
+  },
+  "$defs": {
+    "safeUrl": {
+      "enum": [
+        null,
+        ""
+      ],
+      "description": "Preview has no configured product website; matches server.validate_official_config_url."
+    },
+    "navigation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "actionId",
+        "title",
+        "iconKey",
+        "order",
+        "section",
+        "visible"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "actionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "enum": [
+            "cet",
+            "civil_postgrad",
+            "comprehensive_score",
+            "document",
+            "driving_school",
+            "electric",
+            "errand",
+            "exam",
+            "grade",
+            "gym",
+            "holiday_destination",
+            "ielts_toefl",
+            "logistics_repair",
+            "lost_found",
+            "mandarin",
+            "ncre",
+            "schedule",
+            "secondhand",
+            "weekly_attendance"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "iconKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "enum": [
+            "abc",
+            "assessment",
+            "build",
+            "calendar",
+            "computer",
+            "directions_car",
+            "electric",
+            "event_note",
+            "find_in_page",
+            "fitness_center",
+            "folder",
+            "how_to_reg",
+            "local_shipping",
+            "luggage",
+            "menu_book",
+            "record_voice_over",
+            "shopping_bag"
+          ]
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "section": {
+          "enum": [
+            "learning",
+            "life",
+            "off_campus",
+            "primary",
+            "secondary"
+          ]
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "featureKey": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "url": {
+          "$ref": "#/$defs/safeUrl"
+        }
+      }
+    },
+    "card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "cardType",
+        "title",
+        "description",
+        "order",
+        "visible",
+        "actionId",
+        "url"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "cardType": {
+          "enum": [
+            "notice",
+            "link",
+            "announcement",
+            "remote_page"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "actionId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "url": {
+          "$ref": "#/$defs/safeUrl"
+        }
+      }
+    },
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "description",
+        "url",
+        "visible",
+        "order"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "url": {
+          "$ref": "#/$defs/safeUrl"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
