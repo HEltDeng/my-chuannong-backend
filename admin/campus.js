@@ -30,7 +30,7 @@
     content.innerHTML=`<div class="hero-card"><p class="eyebrow">一起连接校园日常</p><h3>你好，川农运营者</h3><p>成都 · 雅安 · 都江堰<br>从一条校园动态，到一次失物归还，在这里照顾每一份校园日常。</p></div>
       <div class="grid metric-grid">${[['二手好物',data.counts.secondhand,'marketplace'],['失物招领',data.counts['lost-found'],'communityLost'],['已发布机构',data.counts.providers,'providers'],['待处理预约',data.counts.bookings,'bookings']].filter(x=>state.admin.adminRole==='SUPER_ADMIN'||x[2]!=='communityLost').map(([label,n,page])=>`<button class="card metric metric-link" data-campus="go" data-id="${page}"><span>${label}</span><strong>${n}</strong><span>进入管理 →</span></button>`).join('')}</div>
       <h3 class="section-title">常用工作</h3><div class="provider-grid">${[['announcements','发布服务动态','发布、排序和维护 APP 服务页的公告。'],['providers','维护校外园地','管理驾校、雅思托福、考公考研和健身房。'],['guides','更新校园指南','管理跑腿代取、报修、电费的说明与图片。']].map(([page,t,d])=>`<article class="card"><h3>${t}</h3><p class="muted">${d}</p>${button('go','进入管理 →',page)}</article>`).join('')}</div>
-      <div class="module-note">课表、成绩、学校账号与校园网络认证由手机直接处理。这里管理 APP 自建内容和服务；校园活动发布已移除。</div><p class="source-note">我的川农 · 本地管理后台 · 数据来自当前独立数据库</p>`;
+      <div class="module-note">课表、成绩、学校账号与校园网络认证由手机直接处理。这里管理 APP 自建内容和服务；校园活动发布已移除。</div><p class="source-note">我的川农 · 校园运营后台</p>`;
   };
   function pager(data){return `<div class="campus-pager"><span class="muted">共 ${data.total} 条</span>${data.offset?button('page','上一页',String(Math.max(0,data.offset-data.limit))):''}${data.offset+data.limit<data.total?button('page','下一页',String(data.offset+data.limit)):''}</div>`;}
   async function postList(module,filters={}){

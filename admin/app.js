@@ -404,7 +404,7 @@ async function navigate(page, filters = {}) {
   document.querySelectorAll("#nav button").forEach((button) => {
     button.classList.toggle("active", button.dataset.page === page);
   });
-  content.innerHTML = '<div class="empty">正在读取本地数据…</div>';
+  content.innerHTML = '<div class="empty">正在读取数据…</div>';
   try {
     await renderers[page](filters);
     if (page === "overview" && state.overviewScrollY) {
@@ -1482,7 +1482,7 @@ content.addEventListener("click", async (event) => {
           <p>预约资料：<strong id="reservation-profile-value">${escapeHtml(u.reservation_name || "未填写")} · ${escapeHtml(u.reservation_student_id || "未填写")}</strong></p>
           <p class="muted">用户确认：${u.reservation_profile_consented_at ? formatTime(u.reservation_profile_consented_at) : "未确认"} · 最后更新：${formatTime(u.reservation_profile_updated_at)}</p>
           <p class="muted">限制状态：${escapeHtml(details.restriction?.reason || "无限制")}</p>
-          <p class="muted">超级管理员可在本地工作台查看已收集的完整账号与预约资料；密码、哈希、Token、Session、Cookie 和教务数据永不展示。</p>
+          <p class="muted">超级管理员可在管理工作台查看已收集的完整账号与预约资料；密码、哈希、Token、Session、Cookie 和教务数据永不展示。</p>
           ${u.account_status === "DELETED" ? '<p class="muted">该账号个人数据已清理，不能恢复；用户可使用原手机号重新注册。</p>' : `<button type="button" class="danger" data-action="delete-user-account" data-user="${escapeHtml(JSON.stringify(u))}">注销账号</button>`}
         </div>`, async () => {}, "关闭");
     }

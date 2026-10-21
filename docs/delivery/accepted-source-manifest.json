@@ -18,7 +18,7 @@
     },
     {
       "path": "admin/app.js",
-      "sha256": "60449a7ea966e11c330befaae179b27fcf72e3ed0e1608b9f5bf2e2a3a5c5fbd",
+      "sha256": "c9670c79287b5e4b1862bbac647ff12e75e2a7d94d9197c95401eaca2efb58b2",
       "encoding": "utf-8-lf"
     },
     {
@@ -28,12 +28,12 @@
     },
     {
       "path": "admin/campus.js",
-      "sha256": "e8c81480b0c6ac0176c6a031ed8cbd2f62d1a923fbcb39ee4c46f23b8a406748",
+      "sha256": "2124bd447ffeb94a92b82a229c463faccb600bdc1d44e142aaea86cede7a34aa",
       "encoding": "utf-8-lf"
     },
     {
       "path": "admin/index.html",
-      "sha256": "09e3c80e82c77b42bb1ce547e71cd69701fb97fc2384428dfbfda040a866def8",
+      "sha256": "8c3917fcd9e5b63009dfb8ef18f42b71399e11e1dce5daa87981b6053f9ea329",
       "encoding": "utf-8-lf"
     },
     {
