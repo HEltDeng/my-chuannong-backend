@@ -4,6 +4,8 @@
 
 新电脑接手见 [START_HERE.md](START_HERE.md)。客户端：[HEltDeng/my-chuannong-android](https://github.com/HEltDeng/my-chuannong-android/tree/codex/release-1.0.0)。
 
+本次清洗、测试和剩余限制见 [1.0.0 源码审计](docs/2026-10-21-source-audit.md)。生产版本下载地址须为公网 HTTPS 443 直链，不能重定向；安装包最大 512 MiB，并校验声明大小和 SHA-256。
+
 ## 功能
 
 - 我的川农平台账号注册、登录、会话、资料、退出与权限。
