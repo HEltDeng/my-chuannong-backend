@@ -22,9 +22,27 @@
         <label>密码<input id="login-password" type="password" autocomplete="current-password" required></label>
         <button class="primary" type="submit">安全登录</button>
         <p id="login-error" class="error" role="alert"></p>
+        <p id="login-status" class="muted" role="status"></p>
       </form>
     </section>
   </main>
+
+  <dialog id="setup-dialog" aria-labelledby="setup-title">
+    <form id="setup-form" class="stack">
+      <img class="brand-mark" src="/admin/assets/my-chuannong-app-icon.png" alt="我的川农">
+      <p class="eyebrow">MY CHUANNONG</p>
+      <h1 id="setup-title">设置初始超级管理员</h1>
+      <p class="muted">请设置你自己的登录账号和密码。超级管理员可管理全部平台账号，并为各业务板块创建运营管理员。</p>
+      <label>超级管理员账号名<input id="setup-username" name="username" autocomplete="username" maxlength="48" required></label>
+      <label>超级管理员密码<input id="setup-password" name="password" type="password" autocomplete="new-password" minlength="16" maxlength="200" aria-describedby="setup-password-hint" required></label>
+      <span id="setup-password-hint" class="muted">16 至 200 位，请使用你自己的新密码。</span>
+      <label>确认密码<input id="setup-password-confirmation" name="passwordConfirmation" type="password" autocomplete="new-password" minlength="16" maxlength="200" required></label>
+      <p class="muted">保存后临时凭据失效，请使用新账号重新登录。</p>
+      <p id="setup-error" class="error" role="alert"></p>
+      <button id="setup-submit" class="primary" type="submit">保存并重新登录</button>
+      <button id="setup-logout" class="ghost" type="button">退出，稍后设置</button>
+    </form>
+  </dialog>
 
   <div id="app-view" class="app-shell hidden">
     <aside class="sidebar">

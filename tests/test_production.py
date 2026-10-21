@@ -879,6 +879,22 @@ class ProductionRuntimeSmokeTest(unittest.TestCase):
                 )
                 self.assertEqual(200, login_status)
                 admin_token = login["data"]["token"]
+                self.assertTrue(login["data"]["user"]["adminSetupRequired"])
+                self.assertEqual(409, json_request("/api/v1/admin/overview", token=admin_token)[0])
+                owner_password = secrets.token_urlsafe(24)
+                setup_status, _ = json_request(
+                    "/api/v1/admin/account/setup", method="POST", token=admin_token,
+                    data={"username": "TEST_ONLY_OWNER", "password": owner_password,
+                          "passwordConfirmation": owner_password},
+                )
+                self.assertEqual(200, setup_status)
+                self.assertEqual(401, json_request("/api/v1/auth/me", token=admin_token)[0])
+                owner_status, owner = json_request(
+                    "/api/v1/auth/login", method="POST",
+                    data={"username": "TEST_ONLY_OWNER", "password": owner_password},
+                )
+                self.assertEqual(200, owner_status)
+                admin_token = owner["data"]["token"]
                 self.assertEqual(
                     200,
                     json_request("/api/v1/admin/overview", token=admin_token)[0],

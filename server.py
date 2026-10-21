@@ -26,7 +26,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlparse, urlsplit
 from release_artifact import MAX_APK_BYTES, verify as verify_public_release_artifact
 from cryptography.fernet import Fernet, InvalidToken
 from PIL import Image, UnidentifiedImageError
@@ -1162,6 +1162,8 @@ def initialize_database() -> None:
         ensure_column(db, "users", "admin_permissions_json", "TEXT NOT NULL DEFAULT '[]'")
         ensure_column(db, "users", "admin_role", "TEXT")
         ensure_column(db, "users", "admin_enabled", "INTEGER NOT NULL DEFAULT 1")
+        ensure_column(db, "users", "admin_setup_required", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(db, "users", "admin_setup_completed_at", "INTEGER")
         ensure_column(db, "users", "account_status", "TEXT NOT NULL DEFAULT 'ACTIVE'")
         ensure_column(db, "users", "account_status_reason", "TEXT NOT NULL DEFAULT ''")
         ensure_column(db, "users", "account_status_changed_at", "INTEGER")
@@ -1509,7 +1511,7 @@ def bootstrap_admin() -> None:
             )
 
 
-def issue_token(db: sqlite3.Connection, user_id: str) -> str:
+def issue_token(db: sqlite3.Connection, user_id: str, *, verified_password_hash: str | None = None) -> str:
     user = db.execute("SELECT role FROM users WHERE id=?", (user_id,)).fetchone()
     if not user:
         raise RuntimeError("Cannot issue a session for an unknown user")
@@ -1520,15 +1522,21 @@ def issue_token(db: sqlite3.Connection, user_id: str) -> str:
     )
     timestamp = now_ms()
     token = secrets.token_urlsafe(32)
-    db.execute(
-        "INSERT INTO sessions(token_hash,user_id,expires_at,created_at) VALUES(?,?,?,?)",
+    inserted = db.execute(
+        """INSERT INTO sessions(token_hash,user_id,expires_at,created_at)
+           SELECT ?,id,?,? FROM users WHERE id=?
+           AND (? IS NULL OR password_hash=?)""",
         (
             hashlib.sha256(token.encode()).hexdigest(),
-            user_id,
             timestamp + ttl_seconds * 1000,
             timestamp,
+            user_id,
+            verified_password_hash,
+            verified_password_hash,
         ),
     )
+    if inserted.rowcount != 1:
+        raise ApiError(401, "CREDENTIALS_CHANGED", "账号凭据已更新，请使用新账号和密码登录")
     return token
 
 
@@ -2234,6 +2242,7 @@ def serialize_user(user: sqlite3.Row) -> dict[str, Any]:
         "reservationProfileUpdatedAt": user["reservation_profile_updated_at"],
         "adminPermissions": sorted(admin_permissions(user)) if user["role"] == "ADMIN" else [],
         "adminRole": admin_role(user) if user["role"] == "ADMIN" else None,
+        "adminSetupRequired": bool(user["admin_setup_required"]) if user["role"] == "ADMIN" else False,
         "accountStatus": user["account_status"],
         "accountStatusReason": user["account_status_reason"],
         "accountStatusChangedAt": user["account_status_changed_at"],
@@ -2913,6 +2922,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.enforce_rate_limit("login-ip", client, 120, 300)
         elif method == "POST" and path == "/api/v1/auth/register":
             self.enforce_rate_limit("register-ip", client, 30, 300)
+        elif method == "POST" and path == "/api/v1/admin/account/setup":
+            self.enforce_rate_limit("admin-setup-ip", client, 12, 300)
         elif method == "POST" and path == "/api/v1/auth/device":
             self.enforce_rate_limit("device-ip", client, 120, 3600)
         elif method == "POST" and path == "/api/v1/feedback":
@@ -2979,6 +2990,12 @@ class ApiHandler(BaseHTTPRequestHandler):
             raise ApiError(403, "ADMIN_ROLE_INVALID", "管理员角色配置无效")
         if role and user["role"] != role:
             raise ApiError(403, "FORBIDDEN", "权限不足")
+        if user["role"] == "ADMIN" and user["admin_setup_required"]:
+            allowed_setup_paths = {
+                "/api/v1/auth/me", "/api/v1/auth/logout", "/api/v1/admin/account/setup",
+            }
+            if urlsplit(self.path).path not in allowed_setup_paths:
+                raise ApiError(409, "ADMIN_SETUP_REQUIRED", "请先设置初始超级管理员账号和密码")
         timestamp = now_ms()
         last_active = user["last_active_at"] or 0
         if user["role"] == "USER" and timestamp - last_active >= 5 * 60 * 1000:
@@ -3123,6 +3140,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.wfile.write(content)
 
     def route(self, method: str, path: str, query: dict[str, str]) -> tuple[Any, int]:
+        if path == "/api/v1/admin/account/setup" and method in {"GET", "POST"}:
+            return self.admin_account_setup(method), 200
         if path.startswith(("/api/v1/community/", "/api/v1/services/", "/api/v1/admin/campus/")):
             return campus_hub.route(self, method, path, query, globals())
         if "campus-activit" in path or "campus_activit" in path:
@@ -3389,6 +3408,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 elif user and user["role"] == "ADMIN":
                     write_audit(db, user["id"], "ADMIN_LOGIN_FAILED", "ADMIN", user["id"], {"result": "FAILURE"})
                 raise ApiError(401, "INVALID_CREDENTIALS", "账号或密码错误")
+            verified_password_hash = user["password_hash"]
             user = restore_expired_account_limit(db, user)
             if user["account_status"] in {"DISABLED", "PENDING_DELETION", "DELETED", "SUSPENDED"}:
                 if user["role"] == "USER":
@@ -3448,7 +3468,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     client_version=str(data.get("versionName", "")).strip() or None,
                 )
             return {
-                "token": issue_token(db, user["id"]),
+                "token": issue_token(db, user["id"], verified_password_hash=verified_password_hash),
                 "user": serialize_user(user),
                 "migratedDeviceData": migrated,
             }
@@ -4838,6 +4858,50 @@ class ApiHandler(BaseHTTPRequestHandler):
             if not row:
                 raise ApiError(404, "FEEDBACK_NOT_FOUND", "反馈不存在")
             return self.serialize_feedback_for_user(db, row)
+
+    def admin_account_setup(self, method: str) -> dict[str, Any]:
+        """Finish an explicitly armed bootstrap account; never open public enrollment."""
+        data = self.body_json() if method == "POST" else None
+        with connection() as db:
+            # Serialize credential changes and session revocation across concurrent requests.
+            db.execute("BEGIN IMMEDIATE")
+            admin = self.current_user(db, "ADMIN")
+            if not is_super_admin(admin):
+                raise ApiError(403, "SUPER_ADMIN_REQUIRED", "只有初始超级管理员可以完成设置")
+            pending = bool(admin["admin_setup_required"]) and admin["admin_setup_completed_at"] is None
+            if method == "GET":
+                return {"setupRequired": pending}
+            if not pending:
+                raise ApiError(409, "ADMIN_SETUP_CLOSED", "初始设置已完成，不能重复设置")
+            if set(data) != {"username", "password", "passwordConfirmation"}:
+                raise ApiError(400, "INVALID_SETUP_FIELDS", "请填写账号名、密码和确认密码")
+            if not isinstance(data.get("username"), str):
+                raise ApiError(400, "INVALID_USERNAME", "账号名必须为文本")
+            username = required_text(data, "username", 48)
+            if any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in username):
+                raise ApiError(400, "INVALID_USERNAME", "账号名不能包含空白或控制字符")
+            password = data.get("password")
+            if not isinstance(password, str) or not 16 <= len(password) <= 200 or not password.strip():
+                raise ApiError(400, "WEAK_PASSWORD", "超级管理员密码需为 16 至 200 位")
+            if password != password.strip():
+                raise ApiError(400, "WEAK_PASSWORD", "密码首尾不能包含空白字符")
+            if password != data.get("passwordConfirmation"):
+                raise ApiError(400, "PASSWORD_MISMATCH", "两次输入的密码不一致")
+            if verify_password(password, admin["password_hash"], admin["password_salt"]):
+                raise ApiError(400, "PASSWORD_UNCHANGED", "请设置与临时密码不同的新密码")
+            digest, salt = password_record(password)
+            try:
+                db.execute(
+                    """UPDATE users SET username=?,password_hash=?,password_salt=?,
+                       admin_setup_required=0,admin_setup_completed_at=? WHERE id=?""",
+                    (username, digest, salt, now_ms(), admin["id"]),
+                )
+            except sqlite3.IntegrityError as exc:
+                raise ApiError(409, "ADMIN_EXISTS", "该账号名已存在，请更换") from exc
+            db.execute("DELETE FROM sessions WHERE user_id=?", (admin["id"],))
+            write_audit(db, admin["id"], "ADMIN_INITIAL_SETUP_COMPLETED", "ADMIN", admin["id"],
+                        {"usernameChanged": username != admin["username"], "sessionsRevoked": True})
+            return {"configured": True, "username": username, "loginRequired": True}
 
     def admin_route(
         self, method: str, path: str, query: dict[str, str]

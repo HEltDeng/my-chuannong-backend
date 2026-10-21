@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS users (
     admin_permissions_json TEXT NOT NULL DEFAULT '[]',
     admin_role TEXT,
     admin_enabled INTEGER NOT NULL DEFAULT 1,
+    admin_setup_required INTEGER NOT NULL DEFAULT 0,
+    admin_setup_completed_at INTEGER,
     account_status TEXT NOT NULL DEFAULT 'ACTIVE',
     account_status_reason TEXT NOT NULL DEFAULT '',
     account_status_changed_at INTEGER,

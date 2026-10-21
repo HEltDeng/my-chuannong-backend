@@ -18,7 +18,7 @@
     },
     {
       "path": "admin/app.js",
-      "sha256": "c9670c79287b5e4b1862bbac647ff12e75e2a7d94d9197c95401eaca2efb58b2",
+      "sha256": "979ae3eca8783452f48435f7ccfcbf65cc0a68d29ff4f0c5611baf58d9ea5baf",
       "encoding": "utf-8-lf"
     },
     {
@@ -33,7 +33,7 @@
     },
     {
       "path": "admin/index.html",
-      "sha256": "8c3917fcd9e5b63009dfb8ef18f42b71399e11e1dce5daa87981b6053f9ea329",
+      "sha256": "af55aa4deaa43246f4c208ab863f4a8094a6b758b1a31b51304ed71fbce72a82",
       "encoding": "utf-8-lf"
     },
     {
@@ -53,7 +53,7 @@
     },
     {
       "path": "admin/styles.css",
-      "sha256": "cd42bcecc1072f9ed1e0e82b25ca81586815db8859607459ef593f1782eaf64e",
+      "sha256": "379c18a8e448370d69817ec9722488286fed19ce8ef4659d56f6204f96277a94",
       "encoding": "utf-8-lf"
     },
     {
@@ -93,7 +93,7 @@
     },
     {
       "path": "manage.py",
-      "sha256": "2127a2c881501001e784ceacacc9bbca34d3460ac00c7232a851fadd4b63236b",
+      "sha256": "fc158677ca2012210fb99d25360834cabd01959b7a03b1c64c4d3a282ff7147f",
       "encoding": "utf-8-lf"
     },
     {
@@ -138,7 +138,7 @@
     },
     {
       "path": "schema.sql",
-      "sha256": "c1d15fad39a00d318d4db46749beb8546207ed28577428a1a28e67e4ad8dad6f",
+      "sha256": "36be845a253cce08ed808d35f0947dfd8e9d0bc5e0480d1817e3cfb09d3cd0ac",
       "encoding": "utf-8-lf"
     },
     {
@@ -168,7 +168,7 @@
     },
     {
       "path": "server.py",
-      "sha256": "c8d3f2c1a2981ff474de250a77c38431af0cb198023356344454858783f4994e",
+      "sha256": "8fb57449fd9c303d918b2c0d68c20eb00a97df87140d2b98a5a889ab730c18a4",
       "encoding": "utf-8-lf"
     },
     {
@@ -183,7 +183,7 @@
     },
     {
       "path": "tests/test_api.py",
-      "sha256": "573d6e038eb9d183b7035db538900142ec09df014fd63c5ba81280bf0a2f9092",
+      "sha256": "240e4ab648be26ba298b20198ec9f5f8ccac4a3bea037a4642a53270c391fc5c",
       "encoding": "utf-8-lf"
     },
     {
@@ -208,7 +208,7 @@
     },
     {
       "path": "tests/test_production.py",
-      "sha256": "60c9689be210dccbb2245c2f5527dace0f1b9a0357e916cb73d722faf8771eed",
+      "sha256": "561f050d882a67f4aba276caa39df5ea5030b9e64063baaf8e1136c30657151e",
       "encoding": "utf-8-lf"
     },
     {
@@ -240,6 +240,12 @@
       "path": "wsgi.py",
       "sha256": "71db55faa6fb33d7e8f2f6acb5105a9e64f7353c8956cc190767942ddf34689a",
       "encoding": "utf-8-lf"
+    },
+    {
+      "path": "tests/test_admin_setup.py",
+      "sha256": "eb2b9e179cc7b5ce22b8f55134c0d1ee2a7eb5d5fa3cdeca237b56295c15a936",
+      "encoding": "utf-8-lf"
     }
-  ]
+  ],
+  "deployment_note": "2026-10-21: owner-authorized initial super-admin setup, documented in docs/2026-10-21-initial-admin-setup.md; upstream provenance preserved separately."
 }

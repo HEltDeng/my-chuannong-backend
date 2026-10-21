@@ -363,12 +363,23 @@ function showLogin() {
   $("#app-view").classList.add("hidden");
   $("#login-view").classList.remove("hidden");
   $("#login-password").value = "";
+  $("#setup-dialog").close();
+  $("#setup-form").reset();
+}
+
+function showInitialSetup() {
+  $("#login-view").classList.add("hidden");
+  $("#app-view").classList.add("hidden");
+  $("#setup-form").reset();
+  $("#setup-error").textContent = "";
+  if (!$("#setup-dialog").open) $("#setup-dialog").showModal();
 }
 
 async function showApp() {
   try {
     state.admin = await api("/api/v1/auth/me");
     if (state.admin.role !== "ADMIN") throw new Error("该账号没有管理员权限");
+    if (state.admin.adminSetupRequired) return showInitialSetup();
     const role = state.admin.adminRole || (state.admin.adminPermissions?.includes("*") ? "SUPER_ADMIN" : "");
     document.querySelectorAll("#nav [data-roles]").forEach((node) => {
       node.classList.toggle("hidden", !node.dataset.roles.split(" ").includes(role));
@@ -1058,6 +1069,7 @@ async function openInventory(venueId) {
 $("#login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   $("#login-error").textContent = "";
+  $("#login-status").textContent = "";
   try {
     const data = await api("/api/v1/auth/login", {
       method: "POST",
@@ -1076,9 +1088,41 @@ $("#login-form").addEventListener("submit", async (event) => {
   }
 });
 
-$("#logout-button").addEventListener("click", async () => {
+async function logoutAdmin() {
   try { await api("/api/v1/auth/logout", { method: "POST", body: {} }); } catch (_) {}
   showLogin();
+}
+$("#logout-button").addEventListener("click", logoutAdmin);
+$("#setup-logout").addEventListener("click", logoutAdmin);
+$("#setup-dialog").addEventListener("cancel", event => event.preventDefault());
+$("#setup-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const errorNode = $("#setup-error");
+  const submit = $("#setup-submit");
+  errorNode.textContent = "";
+  if ($("#setup-password").value !== $("#setup-password-confirmation").value) {
+    errorNode.textContent = "两次输入的密码不一致";
+    return;
+  }
+  submit.disabled = true;
+  try {
+    const result = await api("/api/v1/admin/account/setup", {
+      method: "POST",
+      body: {
+        username: $("#setup-username").value.trim(),
+        password: $("#setup-password").value,
+        passwordConfirmation: $("#setup-password-confirmation").value,
+      },
+    });
+    showLogin();
+    $("#login-username").value = result.username;
+    $("#login-status").textContent = "超级管理员设置完成。请使用新账号和密码登录。";
+    $("#login-password").focus();
+  } catch (error) {
+    errorNode.textContent = error.message;
+  } finally {
+    submit.disabled = false;
+  }
 });
 
 $("#nav").addEventListener("click", (event) => {

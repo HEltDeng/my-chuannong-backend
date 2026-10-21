@@ -118,14 +118,31 @@ def bootstrap_production() -> None:
         db.execute(
             """INSERT INTO users(
                    id,username,password_hash,password_salt,role,account_type,nickname,
-                   admin_permissions_json,admin_role,admin_enabled,account_status,created_at
+                   admin_permissions_json,admin_role,admin_enabled,account_status,admin_setup_required,created_at
                ) VALUES(?,?,?,?, 'ADMIN','ADMIN','超级管理员','["*"]',
-                        'SUPER_ADMIN',1,'ACTIVE',?)""",
+                        'SUPER_ADMIN',1,'ACTIVE',1,?)""",
             (str(uuid.uuid4()), username, digest, salt, server.now_ms()),
         )
     os.environ.pop("MY_CHUANNONG_SUPER_ADMIN_PASSWORD", None)
     server.ensure_production_database_ready()
-    print("生产数据库已初始化，并创建唯一首个 SUPER_ADMIN。")
+    print("生产数据库已初始化。请使用临时凭据登录后台，由所有者完成首次账号设置。")
+
+
+def require_initial_admin_setup(username: str) -> None:
+    """Migrate the sole, unconfigured bootstrap admin without replacing credentials."""
+    if not server.RUNTIME.is_production:
+        raise ValueError("此命令只用于生产初始管理员的交接")
+    with server.connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        if db.execute("SELECT COUNT(*) FROM users").fetchone()[0] != 1:
+            raise ValueError("只能为尚无其他账号的新后台启用首次设置")
+        admin = db.execute("SELECT * FROM users WHERE username=? AND role='ADMIN'", (username,)).fetchone()
+        if not admin or not server.is_super_admin(admin) or not admin["admin_enabled"]:
+            raise ValueError("必须指定唯一且启用的初始超级管理员")
+        if admin["admin_setup_completed_at"] is not None:
+            raise ValueError("初始账号设置已经完成，不能重新开放")
+        db.execute("UPDATE users SET admin_setup_required=1 WHERE id=?", (admin["id"],))
+    print("首次设置已启用；临时凭据仍用于验证身份，所有者需在后台自行设置新账号和密码。")
 
 
 def main() -> int:
@@ -137,6 +154,8 @@ def main() -> int:
     reset = commands.add_parser("reset-password", help="重置管理员密码")
     reset.add_argument("username")
     commands.add_parser("has-admin", help="检查是否已有管理员")
+    setup = commands.add_parser("require-initial-admin-setup", help="为唯一初始管理员开启所有者设置窗口")
+    setup.add_argument("username")
     commands.add_parser(
         "bootstrap-production",
         help="在干净生产库中从仓库外环境变量创建首个 SUPER_ADMIN",
@@ -149,6 +168,8 @@ def main() -> int:
             reset_password(args.username)
         elif args.command == "bootstrap-production":
             bootstrap_production()
+        elif args.command == "require-initial-admin-setup":
+            require_initial_admin_setup(args.username)
         else:
             return has_admin()
         return 0

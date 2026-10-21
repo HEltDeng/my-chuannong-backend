@@ -2497,7 +2497,7 @@ class ApiTest(unittest.TestCase):
         with urllib.request.urlopen(self.base + "/admin/", timeout=5) as response:
             html = response.read().decode("utf-8")
             self.assertIn("MY CHUANNONG / CAMPUS CONSOLE", html)
-            self.assertIn("本地联调", html)
+            self.assertIn("校园运营后台", html)
             self.assertIn("/admin/assets/my-chuannong-app-icon.png", html)
             self.assertNotIn("LOCAL ADMIN", html)
             self.assertNotIn("仅本机", html)
