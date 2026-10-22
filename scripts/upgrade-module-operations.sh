@@ -71,7 +71,7 @@ systemctl start mychuannong-backend
 ready=0
 for attempt in {1..20}; do
   if curl -fsS --max-time 2 -H 'Host: chuannong-api.mychangliapp.cn' \
-    http://127.0.0.1:8792/api/v1/ready >/dev/null; then ready=1; break; fi
+    http://127.0.0.1:8792/ready >/dev/null; then ready=1; break; fi
   sleep 1
 done
 [[ $ready -eq 1 ]] || { echo 'Readiness check failed.' >&2; exit 1; }
