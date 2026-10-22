@@ -447,10 +447,17 @@ def route(handler,method,path,query,environment):
             s.ensure_feature_open(db,'lost_found' if module=='lost-found' else 'secondhand','失物招领' if module=='lost-found' else '二手好物') if not admin else None
             if module == 'secondhand':
                 from marketplace import handle
-                return handle(handler,method,ident,query,db,user,s,admin)
-            from lostfound_review import handle
-            return handle(handler,method,ident,query,db,user,s,admin)
+            else:
+                from lostfound_review import handle
+            result = handle(handler,method,ident,query,db,user,s,admin)
+            if not admin and method in {'POST','PATCH','DELETE'}:
+                s.account_analytics.record(db,user['id'])
+            return result
         if module=='providers': return providers(handler,method,ident,query,db,user,s,admin)
-        if module=='bookings': return bookings(handler,method,ident,query,db,user,s,admin)
+        if module=='bookings':
+            result = bookings(handler,method,ident,query,db,user,s,admin)
+            if not admin and method in {'POST','PATCH','DELETE'}:
+                s.account_analytics.record(db,user['id'])
+            return result
         if module=='guides': return guides(handler,method,ident,db,user,s,admin)
     fail('接口不存在',404,'NOT_FOUND')

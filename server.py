@@ -52,6 +52,7 @@ from runtime_config import RUNTIME
 from security import RateLimiter
 import campus_hub
 import notification_follows
+import account_analytics
 
 ROOT = Path(__file__).resolve().parent
 UPLOADS = RUNTIME.upload_path
@@ -1249,6 +1250,7 @@ def initialize_database() -> None:
             "TEXT NOT NULL DEFAULT 'OPTIONAL'",
         )
         db.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_phone_hash ON users(phone_hash) WHERE phone_hash IS NOT NULL")
+        account_analytics.initialize(db)
         db.execute(
             """UPDATE users SET account_type=CASE
                WHEN role='ADMIN' THEN 'ADMIN'
@@ -2405,6 +2407,8 @@ def write_user_event(
     )
     if not user_id:
         return
+    if normalized_result == 'SUCCESS' and client_source == 'APP' and identity_kind == 'USER' and event_type in account_analytics.SERVICE_EVENTS:
+        account_analytics.record(db, user_id, timestamp=timestamp)
     rule = None
     threshold = 0
     window_ms = 10 * 60 * 1000
@@ -2509,6 +2513,7 @@ def delete_user_account_data(
     db.execute("DELETE FROM campus_posts WHERE owner_id=?", (user_id,))
     db.execute("DELETE FROM campus_bookings WHERE owner_id=?", (user_id,))
     db.execute("DELETE FROM notification_follows WHERE user_id=?", (user_id,))
+    account_analytics.forget(db, user_id)
     db.execute("DELETE FROM marketplace_notifications WHERE owner_id=?", (user_id,))
     db.execute("DELETE FROM marketplace_deleted_posts WHERE owner_id=?", (user_id,))
     db.execute("DELETE FROM lostfound_review_notifications WHERE owner_id=?", (user_id,))
@@ -3089,7 +3094,7 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def send_admin_asset(self, path: str) -> None:
         relative = "index.html" if path in {"/admin", "/admin/"} else path.removeprefix("/admin/")
-        allowed_assets = {"index.html", "app.js", "campus.js", "marketplace.js", "lostfound-review.js", "module-operations.js", "marketplace.css", "styles.css", "assets/my-chuannong-app-icon.png"}
+        allowed_assets = {"index.html", "app.js", "campus.js", "marketplace.js", "lostfound-review.js", "module-operations.js", "account-analytics.js", "marketplace.css", "styles.css", "assets/my-chuannong-app-icon.png"}
         if relative not in allowed_assets:
             raise ApiError(404, "NOT_FOUND", "管理后台资源不存在")
         target = (ADMIN_WEB / relative).resolve()
@@ -3252,6 +3257,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             return self.public_bootstrap(query), 200
         if path.startswith("/api/v1/notifications/"):
             return notification_follows.route(self, method, path, connection)
+        if method == 'POST' and path == '/api/v1/activity/foreground':
+            return account_analytics.receive(self, connection, record_device_identity)
         if method == "GET" and path == "/api/v1/public/website-announcements":
             return self.public_website_announcements(), 200
         if method == "GET" and path == "/api/v1/public/version/android":
@@ -4930,6 +4937,11 @@ class ApiHandler(BaseHTTPRequestHandler):
                     {"method": method, "role": admin_role(admin)},
                 )
                 raise
+
+            if method == 'GET' and path == '/api/v1/admin/account-analytics':
+                return account_analytics.summary(db, query), 200
+            if method == 'GET' and path == '/api/v1/admin/account-analytics/accounts':
+                return account_analytics.accounts(db, query, serialize_user), 200
 
             if method == "GET" and path.startswith("/api/v1/admin/overview/"):
                 today = date.today().isoformat()

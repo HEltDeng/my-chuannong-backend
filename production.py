@@ -24,6 +24,7 @@ def prepare_runtime() -> None:
 
 def main() -> None:
     prepare_runtime()
+    server.account_analytics.start_retention_worker(server.connection)
     logging.getLogger("mychuannong.runtime").info(
         "production runtime starting",
         extra={"event": "RUNTIME_START"},
