@@ -63,8 +63,31 @@ const roleLabels = {
   SPORTS_OPERATOR: "体育预约运营管理员",
   LOST_FOUND_OPERATOR: "失物招领运营管理员",
   LIBRARY_OPERATOR: "资料库运营管理员",
-  CONTENT_OPERATOR: "内容运营管理员",
+  CONTENT_OPERATOR: "综合内容运营管理员",
+  SECONDHAND_OPERATOR: "二手好物管理员",
+  DRIVING_SCHOOL_OPERATOR: "驾校管理员",
+  IELTS_TOEFL_OPERATOR: "雅思托福管理员",
+  CIVIL_POSTGRAD_OPERATOR: "考公考研管理员",
+  GYM_OPERATOR: "健身房管理员",
+  ERRAND_OPERATOR: "跑腿代取管理员",
+  REPAIR_OPERATOR: "后勤报修管理员",
+  ELECTRIC_OPERATOR: "电费指南管理员",
 };
+
+const moduleWorkspaces = {
+  driving_school: {title: "驾校", role: "DRIVING_SCHOOL_OPERATOR", category: "driving_school"},
+  ielts_toefl: {title: "雅思托福", role: "IELTS_TOEFL_OPERATOR", category: "ielts_toefl"},
+  civil_postgrad: {title: "考公考研", role: "CIVIL_POSTGRAD_OPERATOR", category: "civil_postgrad"},
+  gym: {title: "健身房", role: "GYM_OPERATOR", category: "gym"},
+  errand: {title: "跑腿代取", role: "ERRAND_OPERATOR", guide: "errand"},
+  logistics_repair: {title: "后勤报修", role: "REPAIR_OPERATOR", guide: "logistics_repair"},
+  electric: {title: "电费查询指南", role: "ELECTRIC_OPERATOR", guide: "electric"},
+};
+const moduleHome = role => Object.keys(moduleWorkspaces).find(key => moduleWorkspaces[key].role === role)
+  || ({SECONDHAND_OPERATOR: "marketplace", LOST_FOUND_OPERATOR: "communityLost", LIBRARY_OPERATOR: "resources"}[role]);
+const announcementModules = {general: "综合公告", secondhand: "二手好物", "lost-found": "失物招领", resources: "资料库",
+  ...Object.fromEntries(Object.entries(moduleWorkspaces).map(([key,value])=>[key,value.title]))};
+const operatorAnnouncementModule = role => ({marketplace: "secondhand", communityLost: "lost-found"}[moduleHome(role)] || moduleHome(role));
 
 const $ = (selector) => document.querySelector(selector);
 const content = $("#page-content");
@@ -393,10 +416,12 @@ async function showApp() {
       }
       group.classList.toggle("hidden", !members.some((item) => !item.classList.contains("hidden")));
     });
-    // A fresh administrator session always starts from the role-scoped
-    // dashboard.  Reusing the previous role's route can otherwise land an
-    // operator on a detail page before the workspace context is established.
-    state.page = "overview";
+    // Honor a deep link only when the role's navigation exposes it;
+    // otherwise begin at that operator's own workspace.
+    const requestedPage = location.hash.slice(1);
+    const requestedButton = [...document.querySelectorAll('#nav button[data-page]')]
+      .find(button => button.dataset.page === requestedPage && !button.classList.contains('hidden'));
+    state.page = requestedButton ? requestedPage : moduleHome(role) || "overview";
     const activePage = document.querySelector(`#nav button[data-page="${CSS.escape(state.page)}"]`);
     if (!activePage || activePage.classList.contains("hidden")) state.page = "overview";
     $("#admin-identity").textContent = `当前管理员：${state.admin.nickname || state.admin.id} · ${roleLabels[role] || role}`;
@@ -411,6 +436,9 @@ async function showApp() {
 async function navigate(page, filters = {}) {
   state.page = page;
   state.filters = filters;
+  if (document.querySelector(`#nav button[data-page="${CSS.escape(page)}"]`)) {
+    history.replaceState(null, '', '#' + encodeURIComponent(page));
+  }
   $("#page-title").textContent = filters.title || titles[page];
   document.querySelectorAll("#nav button").forEach((button) => {
     button.classList.toggle("active", button.dataset.page === page);
@@ -741,20 +769,23 @@ const renderers = {
   },
 
   async announcements() {
-    const rows = await api("/api/v1/admin/announcements");
+    const ownModule = operatorAnnouncementModule(state.admin.adminRole);
+    const selectedModule = ownModule || state.filters.module || "";
+    const rows = await api("/api/v1/admin/announcements" + (selectedModule ? "?module="+encodeURIComponent(selectedModule) : ""));
     announcementRows = rows;
     content.innerHTML = `
       <article class="card">
         <h3>发布新公告</h3>
         <form id="announcement-form" class="stack">
+          <label>所属板块<select name="module">${Object.entries(announcementModules).filter(([key])=>!selectedModule||key===selectedModule).map(([key,label])=>`<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`).join("")}</select></label>
           ${announcementFields()}
           <label>标题<input name="title" maxlength="100" required></label>
           <label>内容<textarea name="content" maxlength="4000" required></textarea></label>
           <label class="checkbox-row"><input type="checkbox" name="enabled" checked> 发布后立即在 App 配置接口中可见</label>
           <label class="checkbox-row"><input type="checkbox" name="serviceVisible" checked> 显示在 App 服务页“服务动态”</label>
-          <label class="checkbox-row"><input type="checkbox" name="notificationEnabled"> 发送系统通知（App 同步后提醒）</label>
-          <label class="checkbox-row"><input type="checkbox" name="popupEnabled"> 首次获取时显示 App 内弹窗</label>
-          <p class="muted">系统通知和弹窗默认关闭；开启后由 App 启动或回到前台时同步生效。</p>
+          <label class="checkbox-row"><input type="checkbox" name="notificationEnabled"> 提醒已关注本板块的用户（App 同步后提醒）</label>
+          <label class="checkbox-row"><input type="checkbox" name="popupEnabled"> 向已关注本板块的用户显示 App 内弹窗</label>
+          <p class="muted">通知和弹窗默认关闭，仅向主动关注本板块的用户提醒。未关注的用户仍可在服务页浏览内容。当前由 App 启动或回到前台时同步生效。</p>
           <div><button class="primary">发布公告</button></div>
         </form>
       </article>
@@ -1409,14 +1440,14 @@ content.addEventListener("click", async (event) => {
       return renderers.reservations({...state.filters, page: button.dataset.page});
     }
     if (action === "create-admin") {
-      return openDialog("创建运营管理员", `<div class="stack"><label>用户名<input name="username" maxlength="48" required></label><label>显示名称<input name="nickname" maxlength="40" required></label><label>初始密码<input name="password" type="password" minlength="12" required></label><label>角色<select name="adminRole"><option value="SPORTS_OPERATOR">体育预约运营管理员</option><option value="LOST_FOUND_OPERATOR">失物招领运营管理员</option><option value="LIBRARY_OPERATOR">资料库运营管理员</option><option value="CONTENT_OPERATOR">内容运营管理员</option></select></label><p class="muted">权限由服务端按角色强制执行，隐藏菜单不等于授权。</p></div>`, async form => {
+      return openDialog("创建运营管理员", `<div class="stack"><label>用户名<input name="username" maxlength="48" required></label><label>显示名称<input name="nickname" maxlength="40" required></label><label>初始密码<input name="password" type="password" minlength="12" required></label><label>角色<select name="adminRole">${Object.entries(roleLabels).filter(([role])=>!["SUPER_ADMIN","SPORTS_OPERATOR"].includes(role)).map(([role,label])=>`<option value="${role}">${label}</option>`).join("")}</select></label><p class="muted">权限由服务端按角色强制执行，隐藏菜单不等于授权。</p></div>`, async form => {
         await api("/api/v1/admin/admins", {method:"POST", body:Object.fromEntries(form)});
         toast("运营管理员已创建"); renderers.admins();
       });
     }
     if (action === "edit-admin") {
       const item = JSON.parse(button.dataset.admin);
-      return openDialog("编辑管理员", `<div class="stack"><p><strong>${escapeHtml(item.nickname)}</strong> · ${escapeHtml(item.username)}</p><label>显示名称<input name="nickname" maxlength="40" value="${escapeHtml(item.nickname)}"></label><label>角色<select name="adminRole">${["SUPER_ADMIN","SPORTS_OPERATOR","LOST_FOUND_OPERATOR","LIBRARY_OPERATOR","CONTENT_OPERATOR"].map(role => `<option value="${role}" ${role===item.adminRole?"selected":""}>${roleLabels[role] || role}</option>`).join("")}</select></label><label class="checkbox-row"><input type="checkbox" name="enabled" ${item.enabled?"checked":""}> 启用此管理员</label><label>重置密码（留空不修改）<input type="password" name="password" minlength="12"></label><p class="muted">不能停用或降级最后一个启用的超级管理员；不会修改当前登录账号自身。</p></div>`, async form => {
+      return openDialog("编辑管理员", `<div class="stack"><p><strong>${escapeHtml(item.nickname)}</strong> · ${escapeHtml(item.username)}</p><label>显示名称<input name="nickname" maxlength="40" value="${escapeHtml(item.nickname)}"></label><label>角色<select name="adminRole">${Object.keys(roleLabels).map(role => `<option value="${role}" ${role===item.adminRole?"selected":""}>${roleLabels[role] || role}</option>`).join("")}</select></label><label class="checkbox-row"><input type="checkbox" name="enabled" ${item.enabled?"checked":""}> 启用此管理员</label><label>重置密码（留空不修改）<input type="password" name="password" minlength="12"></label><p class="muted">不能停用或降级最后一个启用的超级管理员；不会修改当前登录账号自身。</p></div>`, async form => {
         await api(`/api/v1/admin/admins/${encodeURIComponent(item.id)}`, {method:"PATCH",body:{nickname:form.get("nickname"),adminRole:form.get("adminRole"),enabled:form.has("enabled")}});
         if (form.get("password")) await api(`/api/v1/admin/admins/${encodeURIComponent(item.id)}/reset-password`, {method:"POST",body:{password:form.get("password")}});
         toast("管理员已更新"); renderers.admins();
@@ -1740,7 +1771,7 @@ content.addEventListener("click", async (event) => {
     }
     if (action === "edit-announcement") {
       const row = announcementRows.find(item => item.id === button.dataset.id) || {};
-      return openDialog("编辑公告", `<div class="stack">${announcementFields(row)}<label>标题<input name="title" value="${escapeHtml(button.dataset.title)}" required></label><label>内容<textarea name="content" required>${escapeHtml(button.dataset.content)}</textarea></label><label class="checkbox-row"><input type="checkbox" name="serviceVisible" ${button.dataset.serviceVisible === "true" ? "checked" : ""}> 显示在 App 服务页“服务动态”</label><label class="checkbox-row"><input type="checkbox" name="notificationEnabled" ${button.dataset.notificationEnabled === "true" ? "checked" : ""}> 发送系统通知（App 同步后提醒）</label><label class="checkbox-row"><input type="checkbox" name="popupEnabled" ${button.dataset.popupEnabled === "true" ? "checked" : ""}> 首次获取时显示 App 内弹窗</label><p class="muted">编辑不会因为公告 ID 不变而自动重新通知已经处理过的设备。</p></div>`,
+      return openDialog("编辑公告", `<div class="stack">${announcementFields(row)}<label>标题<input name="title" value="${escapeHtml(button.dataset.title)}" required></label><label>内容<textarea name="content" required>${escapeHtml(button.dataset.content)}</textarea></label><label class="checkbox-row"><input type="checkbox" name="serviceVisible" ${button.dataset.serviceVisible === "true" ? "checked" : ""}> 显示在 App 服务页“服务动态”</label><label class="checkbox-row"><input type="checkbox" name="notificationEnabled" ${button.dataset.notificationEnabled === "true" ? "checked" : ""}> 提醒已关注本板块的用户（App 同步后提醒）</label><label class="checkbox-row"><input type="checkbox" name="popupEnabled" ${button.dataset.popupEnabled === "true" ? "checked" : ""}> 向已关注本板块的用户显示 App 内弹窗</label><p class="muted">编辑不会因为公告 ID 不变而自动重新通知已经处理过的设备。</p></div>`,
         async (form) => {
           await api(`/api/v1/admin/announcements/${encodeURIComponent(button.dataset.id)}`, {
             method: "PATCH",

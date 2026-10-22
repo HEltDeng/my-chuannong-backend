@@ -9,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import urlsplit
 from core import ApiError, now_ms, parse_pagination, paginated_response
+from module_access import PROVIDER_ROLES, GUIDE_ROLES
 
 CAMPUSES = ('成都校区', '雅安校区', '都江堰校区')
 CATEGORIES = {'driving_school': '驾校', 'ielts_toefl': '雅思托福', 'civil_postgrad': '考公考研', 'gym': '健身房'}
@@ -67,7 +68,18 @@ def authorize_admin(handler, db, module, s):
         return user
     if role == 'LOST_FOUND_OPERATOR' and module == 'lost-found':
         return user
+    if role == 'SECONDHAND_OPERATOR' and module == 'secondhand':
+        return user
+    if role in PROVIDER_ROLES and module in {'providers', 'bookings'}:
+        return user
+    if role in GUIDE_ROLES and module == 'guides':
+        return user
     fail('当前管理员无权访问该业务模块', 403, 'ADMIN_MODULE_FORBIDDEN')
+
+
+def require_scope(actual, allowed):
+    if allowed and actual != allowed:
+        fail('当前管理员无权访问该板块', 403, 'ADMIN_MODULE_FORBIDDEN')
 
 
 def encrypted(s, data):
@@ -224,8 +236,13 @@ def provider_view(row):
 
 
 def providers(handler,method,ident,query,db,user,s,admin):
+    scope = PROVIDER_ROLES.get(s.admin_role(user)) if admin else None
+    if query.get('category'):
+        require_scope(query['category'], scope)
     if method == 'GET':
         where, args = ['1=1'], []
+        if scope:
+            where.append('category=?'); args.append(scope)
         if not admin:
             where.append("status='PUBLISHED'")
         if ident:
@@ -241,12 +258,15 @@ def providers(handler,method,ident,query,db,user,s,admin):
         fail('需要管理员权限',403,'FORBIDDEN')
     old = db.execute('SELECT * FROM campus_providers WHERE id=?',(ident,)).fetchone() if ident else None
     if ident and not old: fail('机构不存在',404,'NOT_FOUND')
+    if old:
+        require_scope(old['category'], scope)
     if method not in ('POST','PUT','PATCH'):
         fail('请使用下架保留预约记录',405,'METHOD_NOT_ALLOWED')
     data = handler.body_json()
     if old:
         data = {**provider_view(old),**data}
     category = choice(data.get('category'),CATEGORIES,'机构类别')
+    require_scope(category, scope)
     status = choice(data.get('status','DRAFT'),('DRAFT','PUBLISHED','UNLISTED'),'状态')
     details = data.get('details',{})
     if not isinstance(details,dict) or len(dump(details).encode()) > 64*1024:
@@ -286,13 +306,22 @@ def booking_view(row,user,s,admin):
 
 
 def bookings(handler,method,ident,query,db,user,s,admin):
+    scope = PROVIDER_ROLES.get(s.admin_role(user)) if admin else None
+    category = query.get('category')
+    if category:
+        choice(category, CATEGORIES, '机构类别')
+        require_scope(category, scope)
     if method=='GET':
         where,args=['1=1'],[]
         if not admin: where.append('b.owner_id=?');args.append(user['id'])
+        if scope or category:
+            where.append('p.category=?');args.append(scope or category)
+        if ident:
+            where.append('b.id=?');args.append(ident)
         if query.get('status'): where.append('b.status=?');args.append(choice(query['status'],('PENDING','CONFIRMED','COMPLETED','CANCELLED','REJECTED'),'状态'))
         limit,offset=parse_pagination(query)
         condition=' AND '.join(where)
-        total=db.execute('SELECT COUNT(*) FROM campus_bookings b WHERE '+condition,args).fetchone()[0]
+        total=db.execute('SELECT COUNT(*) FROM campus_bookings b JOIN campus_providers p ON p.id=b.provider_id WHERE '+condition,args).fetchone()[0]
         rows=db.execute('SELECT b.*,p.name AS provider_name,p.category FROM campus_bookings b JOIN campus_providers p ON p.id=b.provider_id WHERE '+condition+' ORDER BY b.created_at DESC LIMIT ? OFFSET ?',[*args,limit,offset]).fetchall()
         return paginated_response([booking_view(r,user,s,admin) for r in rows],total,limit,offset),200
     if method=='POST' and not ident and not admin:
@@ -326,6 +355,9 @@ def bookings(handler,method,ident,query,db,user,s,admin):
         db.execute('BEGIN IMMEDIATE')
         row=db.execute('SELECT * FROM campus_bookings WHERE id=?',(ident,)).fetchone()
         if not row: fail('预约不存在',404,'NOT_FOUND')
+        if scope:
+            provider = db.execute('SELECT category FROM campus_providers WHERE id=?', (row['provider_id'],)).fetchone()
+            require_scope(provider['category'], scope)
         if not admin and (row['owner_id']!=user['id'] or status!='CANCELLED'):
             fail('只能取消自己的预约',403,'FORBIDDEN')
         transitions={'PENDING':{'CONFIRMED','CANCELLED','REJECTED'},'CONFIRMED':{'COMPLETED','CANCELLED'}}
@@ -338,8 +370,13 @@ def bookings(handler,method,ident,query,db,user,s,admin):
 
 
 def guides(handler,method,ident,db,user,s,admin):
+    scope = GUIDE_ROLES.get(s.admin_role(user)) if admin else None
+    if ident:
+        require_scope(ident, scope)
     if method=='GET':
         rows=db.execute('SELECT * FROM campus_guides'+('' if admin else " WHERE status='PUBLISHED'")).fetchall()
+        if scope:
+            rows = [r for r in rows if r['id'] == scope]
         if ident:
             row=next((r for r in rows if r['id']==ident),None)
             if not row: fail('指南尚未发布',404,'NOT_FOUND')
@@ -363,6 +400,30 @@ def guides(handler,method,ident,db,user,s,admin):
     fail('不支持的操作',405,'METHOD_NOT_ALLOWED')
 
 
+def create_admin_post(handler, module, db, user, s):
+    data = handler.body_json()
+    client = text(data, 'clientId', 100, True)
+    db.execute('BEGIN IMMEDIATE')
+    existing = db.execute('SELECT * FROM campus_posts WHERE module=? AND owner_id=? AND client_id=?',
+                          (module, user['id'], client)).fetchone()
+    if existing:
+        return post_view(existing, user, s, detail=True, admin=True), 200
+    deleted_table = 'marketplace_deleted_posts' if module == 'secondhand' else 'lostfound_review_deleted_posts'
+    if db.execute(f'SELECT 1 FROM {deleted_table} WHERE owner_id=? AND client_id=?', (user['id'], client)).fetchone():
+        fail('这条提交已被删除，请重新创建信息', 409, 'POST_DELETED')
+    value, contact = post_payload(handler, data, module)
+    value['ownerName'] = user['nickname'] or '校园运营'
+    if module == 'lost-found':
+        value['done'] = False
+    ident, timestamp = str(uuid.uuid4()), now_ms()
+    db.execute('''INSERT INTO campus_posts(id,module,owner_id,client_id,title,campus,payload_json,
+                  contact_encrypted,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,'PUBLISHED',?,?)''',
+               (ident,module,user['id'],client,value['title'],value['campus'],dump(value),encrypted(s,contact),timestamp,timestamp))
+    s.write_audit(db,user['id'],'CAMPUS_POST_PUBLISH',module,ident,{'status':'PUBLISHED'})
+    db.commit()
+    return post_view(db.execute('SELECT * FROM campus_posts WHERE id=?',(ident,)).fetchone(),user,s,detail=True,admin=True),201
+
+
 def route(handler,method,path,query,environment):
     s=SimpleNamespace(**environment)
     admin=path.startswith('/api/v1/admin/campus/')
@@ -381,6 +442,8 @@ def route(handler,method,path,query,environment):
         if admin and method=='GET' and module=='catalogue':
             return {'navigation':s.default_app_config()['navigation'],'schoolData':'device-only','removed':sorted(REMOVED)},200
         if module in POST_MODULES:
+            if admin and method == 'POST' and not ident:
+                return create_admin_post(handler, module, db, user, s)
             s.ensure_feature_open(db,'lost_found' if module=='lost-found' else 'secondhand','失物招领' if module=='lost-found' else '二手好物') if not admin else None
             if module == 'secondhand':
                 from marketplace import handle

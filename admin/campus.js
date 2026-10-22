@@ -24,7 +24,8 @@
   Object.assign(titles,{overview:'校园运营工作台',marketplace:'二手好物',communityLost:'失物招领',providers:'机构与课程',bookings:'预约管理',guides:'校园服务指南',catalogue:'APP 功能对照'});
   const originalOverview=renderers.overview;
   renderers.overview=async()=>{
-    if(state.admin.adminRole==='LOST_FOUND_OPERATOR')return navigate('communityLost');
+    const home=moduleHome(state.admin.adminRole);
+    if(home)return navigate(home);
     if(!['SUPER_ADMIN','CONTENT_OPERATOR'].includes(state.admin.adminRole))return originalOverview();
     const data=await api(base+'summary');
     content.innerHTML=`<div class="hero-card"><p class="eyebrow">一起连接校园日常</p><h3>你好，川农运营者</h3><p>成都 · 雅安 · 都江堰<br>从一条校园动态，到一次失物归还，在这里照顾每一份校园日常。</p></div>
@@ -50,7 +51,8 @@
     return `<div class="sub-card course-editor"><input type="hidden" name="courseId" value="${E(course.id||crypto.randomUUID())}"><div class="stack">${field('courseTitle','课程 / 班型名称',course.title||course.name||'')}${field('coursePrice','参考价格（元，可留空）',course.price??'','number')}${area('courseDescription','课程说明',course.description||'')}${button('course-remove','移除此课程')}</div></div>`;
   }
   function editProvider(row={}){
-    openDialog(row.id?'编辑机构':'新增机构',`<div class="stack">${picker('category','板块',Object.keys(categories),row.category||'driving_school')}${field('name','机构名称',row.name)}${picker('campus','校区',campuses,row.campus||campuses[0])}${area('summary','简介',row.summary)}${field('address','地址',row.address)}${field('phone','公开咨询电话',row.phone)}${imageFields(row.image)}${field('sortOrder','显示顺序',row.sortOrder||0,'number')}${picker('status','发布状态',['DRAFT','PUBLISHED','UNLISTED'],row.status||'DRAFT')}<label class="checkbox-row"><input type="checkbox" name="isDemo" ${row.isDemo?'checked':''}>演示内容</label><label class="checkbox-row"><input type="checkbox" name="bookingEnabled" ${row.bookingEnabled?'checked':''}>开放预约意向登记</label>${area('description','详细介绍',row.details?.description)}${field('hours','营业 / 接待时间',row.details?.hours)}${field('pickup','接送说明',row.details?.pickup)}<h4>课程与班型</h4><div id="campus-course-editor" class="grid">${(row.details?.courses||[]).map(courseFields).join('')}</div>${button('course-add','＋ 添加课程 / 班型')}${area('facilities','设施与服务（每行一项）',(row.details?.facilities||[]).join('\n'))}${area('bookingSlots','可预约时段说明（每行一项）',(row.details?.bookingSlots||[]).join('\n'))}</div>`,async data=>{
+    const scopedCategory=moduleWorkspaces[state.page]?.category || moduleWorkspaces[moduleHome(state.admin.adminRole)]?.category;
+    openDialog(row.id?'编辑机构':'新增机构',`<div class="stack">${picker('category','板块',Object.keys(categories).filter(key=>!scopedCategory||key===scopedCategory),row.category||state.filters.category||'driving_school')}${field('name','机构名称',row.name)}${picker('campus','校区',campuses,row.campus||campuses[0])}${area('summary','简介',row.summary)}${field('address','地址',row.address)}${field('phone','公开咨询电话',row.phone)}${imageFields(row.image)}${field('sortOrder','显示顺序',row.sortOrder||0,'number')}${picker('status','发布状态',['DRAFT','PUBLISHED','UNLISTED'],row.status||'DRAFT')}<label class="checkbox-row"><input type="checkbox" name="isDemo" ${row.isDemo?'checked':''}>演示内容</label><label class="checkbox-row"><input type="checkbox" name="bookingEnabled" ${row.bookingEnabled?'checked':''}>开放预约意向登记</label>${area('description','详细介绍',row.details?.description)}${field('hours','营业 / 接待时间',row.details?.hours)}${field('pickup','接送说明',row.details?.pickup)}<h4>课程与班型</h4><div id="campus-course-editor" class="grid">${(row.details?.courses||[]).map(courseFields).join('')}</div>${button('course-add','＋ 添加课程 / 班型')}${area('facilities','设施与服务（每行一项）',(row.details?.facilities||[]).join('\n'))}${area('bookingSlots','可预约时段说明（每行一项）',(row.details?.bookingSlots||[]).join('\n'))}</div>`,async data=>{
       const b=Object.fromEntries(data);b.sortOrder=Number(b.sortOrder);b.isDemo=data.has('isDemo');b.bookingEnabled=data.has('bookingEnabled');b.image=await imageInput(data,row.image);
       const ids=data.getAll('courseId'), prices=data.getAll('coursePrice'), descriptions=data.getAll('courseDescription');
       const courses=data.getAll('courseTitle').map((title,i)=>{
@@ -60,7 +62,7 @@
       });
       b.details={description:b.description,hours:b.hours,pickup:b.pickup,courses,facilities:b.facilities.split('\n').map(v=>v.trim()).filter(Boolean),bookingSlots:b.bookingSlots.split('\n').map(v=>v.trim()).filter(Boolean)};
       delete b.imageFile;
-      await api(base+'providers'+(row.id?'/'+row.id:''),{method:row.id?'PUT':'POST',body:b});toast('机构资料已保存');await renderers.providers(state.filters);
+      await api(base+'providers'+(row.id?'/'+row.id:''),{method:row.id?'PUT':'POST',body:b});toast('机构资料已保存');await navigate(state.page,state.filters);
     });
   }
   let bookingRows=[];
@@ -71,6 +73,8 @@
   let guideRows=[];
   renderers.guides=async()=>{
     guideRows=(await api(base+'guides')).items;
+    const guide=moduleWorkspaces[state.page]?.guide;
+    if(guide)guideRows=guideRows.filter(row=>row.id===guide);
     content.innerHTML=`<div class="provider-grid">${guideRows.map(r=>`<article class="card"><div class="card-header"><h3>${E(r.title)}</h3>${tag(r.status)}</div>${imageMarkup(r.image)}<p class="campus-detail">${E(r.body||'尚未填写服务说明')}</p>${button('guide-edit','编辑指南',r.id)}</article>`).join('')}</div><p class="source-note">指南用于说明流程和维护图片，不接收学校账号或密码。</p>`;
   };
   renderers.catalogue=async()=>{
@@ -81,6 +85,7 @@
   document.addEventListener('submit',async event=>{
     if(event.target.id!=='campus-filter')return;
     event.preventDefault();const f=Object.fromEntries(new FormData(event.target));
+    if(state.page==='bookings' && state.filters.category)f.category=state.filters.category;
     await navigate(state.page,Object.fromEntries(Object.entries(f).filter(([,v])=>v)));
   });
   document.addEventListener('click',async event=>{
@@ -108,7 +113,7 @@
       }
       if(action==='guide-edit'){
         const r=guideRows.find(r=>r.id===id);
-        return openDialog('编辑服务指南',`<div class="stack">${field('title','标题',r.title)}${area('body','操作说明',r.body)}${imageFields(r.image)}${field('url','HTTPS 参考链接（可留空）',r.url,'url')}${picker('status','状态',['DRAFT','PUBLISHED','UNLISTED'],r.status)}</div>`,async data=>{const body=Object.fromEntries(data);body.image=await imageInput(data,r.image);delete body.imageFile;await api(base+'guides/'+id,{method:'PUT',body});toast('指南已保存');await renderers.guides();});
+        return openDialog('编辑服务指南',`<div class="stack">${field('title','标题',r.title)}${area('body','操作说明',r.body)}${imageFields(r.image)}${field('url','HTTPS 参考链接（可留空）',r.url,'url')}${picker('status','状态',['DRAFT','PUBLISHED','UNLISTED'],r.status)}</div>`,async data=>{const body=Object.fromEntries(data);body.image=await imageInput(data,r.image);delete body.imageFile;await api(base+'guides/'+id,{method:'PUT',body});toast('指南已保存');await navigate(state.page,state.filters);});
       }
       if(action==='catalogue-draft'){
         const data=await api(base+'catalogue');

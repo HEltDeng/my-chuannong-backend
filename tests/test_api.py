@@ -624,8 +624,9 @@ class ApiTest(unittest.TestCase):
         current = next(
             row for row in bootstrap["data"]["announcements"] if row["id"] == announcement_id
         )
-        self.assertIs(current["notificationEnabled"], True)
-        self.assertIs(current["popupEnabled"], True)
+        # Public content remains readable, but delivery requires an authenticated follow.
+        self.assertIs(current["notificationEnabled"], False)
+        self.assertIs(current["popupEnabled"], False)
 
         status, edited = self.call(
             "PATCH",

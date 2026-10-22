@@ -51,6 +51,7 @@ from core import (
 from runtime_config import RUNTIME
 from security import RateLimiter
 import campus_hub
+import notification_follows
 
 ROOT = Path(__file__).resolve().parent
 UPLOADS = RUNTIME.upload_path
@@ -79,7 +80,9 @@ RESERVATION_PROFILE_VERSION = 1
 ACCOUNT_STATUSES = {"ACTIVE", "LIMITED", "DISABLED", "PENDING_DELETION", "DELETED"}
 USER_EVENT_RESULTS = {"SUCCESS", "FAILURE", "DENIED"}
 USER_EVENT_RETENTION_DAYS = 180
-ADMIN_ROLES = {
+from module_access import MODULE_ROLES, ANNOUNCEMENT_ROLES, announcement_scope
+
+ADMIN_ROLES = MODULE_ROLES | {
     "SUPER_ADMIN",
     "SPORTS_OPERATOR",
     "LOST_FOUND_OPERATOR",
@@ -1136,6 +1139,7 @@ def initialize_database() -> None:
             raise RuntimeError("SQLite WAL mode could not be enabled")
         db.executescript((ROOT / "schema.sql").read_text(encoding="utf-8"))
         campus_hub.initialize(db)
+        notification_follows.initialize(db)
         ensure_default_app_config(db)
         ensure_column(db, "venues", "operating_status", "TEXT NOT NULL DEFAULT 'OPEN'")
         ensure_column(db, "venues", "maintenance_note", "TEXT NOT NULL DEFAULT ''")
@@ -1205,6 +1209,7 @@ def initialize_database() -> None:
         ensure_column(db, "announcements", "target_url", "TEXT")
         ensure_column(db, "announcements", "notification_enabled", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(db, "announcements", "popup_enabled", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(db, "announcements", "module_id", "TEXT NOT NULL DEFAULT 'general'")
         ensure_column(db, "reservations", "refund_status", "TEXT NOT NULL DEFAULT 'NOT_APPLICABLE'")
         ensure_column(db, "reservations", "reservation_code", "TEXT")
         ensure_column(db, "reservations", "verification_status", "TEXT NOT NULL DEFAULT 'NOT_REQUIRED'")
@@ -1999,6 +2004,8 @@ def require_admin_path_access(user: sqlite3.Row, method: str, path: str) -> None
     if not bool(user["admin_enabled"]):
         raise ApiError(403, "ADMIN_DISABLED", "管理员账号已停用")
     allowed = False
+    if role in ANNOUNCEMENT_ROLES and re.fullmatch(r"/api/v1/admin/announcements(?:/[^/]+)?", path):
+        return
     if role == "SPORTS_OPERATOR":
         allowed = any(token in path for token in ("/venues", "/inventory", "/reservations", "/reservation-rules", "/overview/sports"))
     elif role == "LOST_FOUND_OPERATOR":
@@ -2501,6 +2508,7 @@ def delete_user_account_data(
                 image_names.append(image.rsplit("/", 1)[1])
     db.execute("DELETE FROM campus_posts WHERE owner_id=?", (user_id,))
     db.execute("DELETE FROM campus_bookings WHERE owner_id=?", (user_id,))
+    db.execute("DELETE FROM notification_follows WHERE user_id=?", (user_id,))
     db.execute("DELETE FROM marketplace_notifications WHERE owner_id=?", (user_id,))
     db.execute("DELETE FROM marketplace_deleted_posts WHERE owner_id=?", (user_id,))
     db.execute("DELETE FROM lostfound_review_notifications WHERE owner_id=?", (user_id,))
@@ -3081,7 +3089,7 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def send_admin_asset(self, path: str) -> None:
         relative = "index.html" if path in {"/admin", "/admin/"} else path.removeprefix("/admin/")
-        allowed_assets = {"index.html", "app.js", "campus.js", "marketplace.js", "lostfound-review.js", "marketplace.css", "styles.css", "assets/my-chuannong-app-icon.png"}
+        allowed_assets = {"index.html", "app.js", "campus.js", "marketplace.js", "lostfound-review.js", "module-operations.js", "marketplace.css", "styles.css", "assets/my-chuannong-app-icon.png"}
         if relative not in allowed_assets:
             raise ApiError(404, "NOT_FOUND", "管理后台资源不存在")
         target = (ADMIN_WEB / relative).resolve()
@@ -3242,6 +3250,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             return self.library_complaint(match.group(1)), 201
         if method == "GET" and path == "/api/v1/public/bootstrap":
             return self.public_bootstrap(query), 200
+        if path.startswith("/api/v1/notifications/"):
+            return notification_follows.route(self, method, path, connection)
         if method == "GET" and path == "/api/v1/public/website-announcements":
             return self.public_website_announcements(), 200
         if method == "GET" and path == "/api/v1/public/version/android":
@@ -4454,8 +4464,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             announcements = []
             for row in db.execute(
                 """SELECT id,title,content,
-                          notification_enabled AS notificationEnabled,
-                          popup_enabled AS popupEnabled,
+                          0 AS notificationEnabled,
+                          0 AS popupEnabled,
                           published_at AS publishedAt
                      FROM announcements
                     WHERE enabled=1
@@ -6750,6 +6760,12 @@ class ApiHandler(BaseHTTPRequestHandler):
                 return {"id": match.group(1), "status": status}, 200
 
             if method == "GET" and path == "/api/v1/admin/announcements":
+                module = announcement_scope(admin_role(admin), query.get("module") or None)
+                rows = db.execute(
+                    "SELECT * FROM announcements" + (" WHERE module_id=?" if module else "")
+                    + " ORDER BY sort_order ASC, published_at DESC",
+                    (module,) if module else (),
+                )
                 return [
                     {
                         **row_dict(row),
@@ -6758,9 +6774,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                         "notificationEnabled": bool(row["notification_enabled"]),
                         "popupEnabled": bool(row["popup_enabled"]),
                     }
-                    for row in db.execute(
-                        "SELECT * FROM announcements ORDER BY sort_order ASC, published_at DESC"
-                    )
+                    for row in rows
                 ], 200
 
             if method == "GET" and path == "/api/v1/admin/website-announcements":
@@ -6857,6 +6871,7 @@ class ApiHandler(BaseHTTPRequestHandler):
 
             if method == "POST" and path == "/api/v1/admin/announcements":
                 data = self.body_json()
+                module = announcement_scope(admin_role(admin), data.get("module")) or "general"
                 announcement_id = str(uuid.uuid4())
                 timestamp = now_ms()
                 service_visible = 1 if bool(data.get("serviceVisible", True)) else 0
@@ -6880,6 +6895,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     ),
                 )
                 self.update_announcement_metadata(db, announcement_id, data)
+                db.execute("UPDATE announcements SET module_id=? WHERE id=?", (module, announcement_id))
                 write_audit(
                     db,
                     admin["id"],
@@ -6909,6 +6925,9 @@ class ApiHandler(BaseHTTPRequestHandler):
                 ).fetchone()
                 if not current:
                     raise ApiError(404, "ANNOUNCEMENT_NOT_FOUND", "公告不存在")
+                announcement_scope(admin_role(admin), current["module_id"])
+                if "module" in data and data["module"] != current["module_id"]:
+                    raise ApiError(422, "VALIDATION_ERROR", "编辑时不能更改公告所属板块")
                 title = str(data.get("title", current["title"])).strip()[:100]
                 content = str(data.get("content", current["content"])).strip()[:4000]
                 enabled = 1 if bool(data.get("enabled", bool(current["enabled"]))) else 0
@@ -6967,6 +6986,10 @@ class ApiHandler(BaseHTTPRequestHandler):
                 }, 200
 
             if method == "DELETE" and match:
+                current = db.execute("SELECT module_id FROM announcements WHERE id=?", (match.group(1),)).fetchone()
+                if not current:
+                    raise ApiError(404, "ANNOUNCEMENT_NOT_FOUND", "公告不存在")
+                announcement_scope(admin_role(admin), current["module_id"])
                 changed = db.execute(
                     "DELETE FROM announcements WHERE id=?", (match.group(1),)
                 ).rowcount
