@@ -3,24 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" href="/admin/assets/my-chuannong-app-icon.png">
+  <link rel="icon" href="/admin/assets/my-chuannong-app-icon.png?v=20261023-cleanup">
   <title>我的川农 · 校园运营后台</title>
-  <link rel="stylesheet" href="/admin/styles.css">
-  <link rel="stylesheet" href="/admin/marketplace.css">
+  <link rel="stylesheet" href="/admin/styles.css?v=20261023-cleanup">
+  <link rel="stylesheet" href="/admin/marketplace.css?v=20261023-cleanup">
 </head>
 <body>
   <div id="toast" class="toast" aria-live="polite"></div>
 
   <main id="login-view" class="login-shell">
     <section class="login-card">
-      <img class="brand-mark" src="/admin/assets/my-chuannong-app-icon.png" alt="我的川农">
-      <p class="eyebrow">MY CHUANNONG</p>
-      <h1>校园运营后台</h1>
-      <p class="muted">管理校园内容，连接川农日常。</p>
+      <img class="brand-mark" src="/admin/assets/my-chuannong-app-icon.png?v=20261023-cleanup" alt="我的川农">
+      <h1>我的川农管理后台</h1>
       <form id="login-form" class="stack">
         <label>管理员用户名<input id="login-username" autocomplete="username" required></label>
         <label>密码<input id="login-password" type="password" autocomplete="current-password" required></label>
-        <button class="primary" type="submit">安全登录</button>
+        <button class="primary" type="submit">登录</button>
         <p id="login-error" class="error" role="alert"></p>
         <p id="login-status" class="muted" role="status"></p>
       </form>
@@ -29,8 +27,7 @@
 
   <dialog id="setup-dialog" aria-labelledby="setup-title">
     <form id="setup-form" class="stack">
-      <img class="brand-mark" src="/admin/assets/my-chuannong-app-icon.png" alt="我的川农">
-      <p class="eyebrow">MY CHUANNONG</p>
+      <img class="brand-mark" src="/admin/assets/my-chuannong-app-icon.png?v=20261023-cleanup" alt="我的川农">
       <h1 id="setup-title">设置初始超级管理员</h1>
       <p class="muted">请设置你自己的登录账号和密码。超级管理员可管理全部平台账号，并为各业务板块创建运营管理员。</p>
       <label>超级管理员账号名<input id="setup-username" name="username" autocomplete="username" maxlength="48" required></label>
@@ -46,7 +43,7 @@
 
   <div id="app-view" class="app-shell hidden">
     <aside class="sidebar">
-      <div class="brand-row"><img class="brand-mark small" src="/admin/assets/my-chuannong-app-icon.png" alt="我的川农"><div><strong>我的川农</strong><span>校园运营后台</span></div></div>
+      <div class="brand-row"><img class="brand-mark small" src="/admin/assets/my-chuannong-app-icon.png?v=20261023-cleanup" alt="我的川农"><strong>我的川农</strong></div>
       <nav id="nav">
         <span class="nav-group">概览</span>
         <button data-page="overview" class="active" data-roles="SUPER_ADMIN SPORTS_OPERATOR LOST_FOUND_OPERATOR LIBRARY_OPERATOR CONTENT_OPERATOR SECONDHAND_OPERATOR DRIVING_SCHOOL_OPERATOR IELTS_TOEFL_OPERATOR CIVIL_POSTGRAD_OPERATOR GYM_OPERATOR ERRAND_OPERATOR REPAIR_OPERATOR ELECTRIC_OPERATOR">工作台概览</button>
@@ -70,11 +67,17 @@
         <button data-page="resources" data-roles="SUPER_ADMIN LIBRARY_OPERATOR">资料管理</button>
         <button data-page="resourceComplaints" data-roles="SUPER_ADMIN LIBRARY_OPERATOR">资料投诉 / 举报处理</button>
         <span class="nav-group">内容运营</span>
-        <button data-page="announcements" data-roles="SUPER_ADMIN CONTENT_OPERATOR SECONDHAND_OPERATOR LOST_FOUND_OPERATOR LIBRARY_OPERATOR DRIVING_SCHOOL_OPERATOR IELTS_TOEFL_OPERATOR CIVIL_POSTGRAD_OPERATOR GYM_OPERATOR ERRAND_OPERATOR REPAIR_OPERATOR ELECTRIC_OPERATOR">APP 公告与板块动态</button>
-        <button data-page="catalogue" data-roles="SUPER_ADMIN">APP 功能对照</button>
-        <button data-page="config" data-roles="SUPER_ADMIN">版本与功能开关</button>
+        <button data-page="announcements" data-roles="SUPER_ADMIN CONTENT_OPERATOR SECONDHAND_OPERATOR LOST_FOUND_OPERATOR LIBRARY_OPERATOR DRIVING_SCHOOL_OPERATOR IELTS_TOEFL_OPERATOR CIVIL_POSTGRAD_OPERATOR GYM_OPERATOR ERRAND_OPERATOR REPAIR_OPERATOR ELECTRIC_OPERATOR">应用公告与板块动态</button>
+        <button data-page="catalogue" data-roles="SUPER_ADMIN">应用功能对照</button>
+        <button data-page="devicePrivacy" data-roles="SUPER_ADMIN">设备与协议记录</button>
+        <button data-page="serviceAvailability" data-roles="SUPER_ADMIN">服务开放状态</button>
+        <button data-page="config" data-roles="SUPER_ADMIN">版本与配置</button>
+        <button data-page="iosRelease" data-roles="SUPER_ADMIN">苹果版本管理</button>
+        <span class="nav-group">主要设置</span>
+        <button data-page="qqGroup" data-roles="SUPER_ADMIN">QQ 聊天群</button>
         <span class="nav-group">平台管理</span>
-        <button data-page="users" data-roles="SUPER_ADMIN">用户与权限</button>
+        <button data-page="accountDirectory" data-roles="SUPER_ADMIN">查看账号</button>
+          <button data-page="users" data-roles="SUPER_ADMIN">用户与权限</button>
         <button data-page="admins" data-roles="SUPER_ADMIN">运营管理员</button>
         <button data-page="riskCandidates" data-roles="SUPER_ADMIN">异常候选</button>
         <button data-page="userEvents" data-roles="SUPER_ADMIN">用户行为记录</button>
@@ -86,8 +89,8 @@
 
     <section class="workspace">
       <header class="topbar">
-        <div><p class="eyebrow">MY CHUANNONG / CAMPUS CONSOLE</p><h2 id="page-title">概览</h2></div>
-        <div><div id="admin-identity" class="muted"></div><div class="local-pill"><span></span>运营后台</div></div>
+        <div><h2 id="page-title">概览</h2></div>
+        <div id="admin-identity" class="muted"></div>
       </header>
       <div id="page-content" class="content" aria-live="polite"></div>
     </section>
@@ -102,11 +105,14 @@
       </div>
     </form>
   </dialog>
-  <script src="/admin/app.js"></script>
-  <script src="/admin/campus.js"></script>
-  <script src="/admin/marketplace.js"></script>
-  <script src="/admin/lostfound-review.js"></script>
-  <script src="/admin/module-operations.js"></script>
-  <script src="/admin/account-analytics.js"></script>
+  <script src="/admin/app.js?v=20261023-cleanup"></script>
+  <script src="/admin/campus.js?v=20261023-cleanup"></script>
+  <script src="/admin/marketplace.js?v=20261023-cleanup"></script>
+  <script src="/admin/lostfound-review.js?v=20261023-cleanup"></script>
+  <script src="/admin/module-operations.js?v=20261023-cleanup"></script>
+  <script src="/admin/account-analytics.js?v=20261023-cleanup"></script>
+  <script src="/admin/ios-release.js?v=20261023-cleanup"></script>
+  <script src="/admin/service-availability.js?v=20261023-cleanup"></script>
+  <script src="/admin/qq-group.js?v=20261023-cleanup"></script>
 </body>
 </html>

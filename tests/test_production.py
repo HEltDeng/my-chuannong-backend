@@ -867,7 +867,8 @@ class ProductionRuntimeSmokeTest(unittest.TestCase):
                     self.assertEqual(200, response.status)
                     public_bootstrap = json.loads(response.read())
                     self.assertTrue(public_bootstrap["ok"])
-                    self.assertEqual(6, len(public_bootstrap["data"]["flags"]))
+                    # Ten user-facing services plus three retained legacy flags.
+                    self.assertEqual(13, len(public_bootstrap["data"]["flags"]))
 
                 login_status, login = json_request(
                     "/api/v1/auth/login",

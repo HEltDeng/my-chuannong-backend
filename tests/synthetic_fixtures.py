@@ -1,4 +1,17 @@
 """Synthetic fixtures for retained legacy API tests. Never imported by runtime code."""
+def sms_registration(server, payload):
+    """Issue a synthetic grant for business tests; delivery is covered separately."""
+    import secrets
+    import phone_auth
+    data = dict(payload)
+    at = server.now_ms()
+    ident, code = secrets.token_urlsafe(24), '123456'
+    with server.connection() as db:
+        db.execute('INSERT INTO phone_challenges(id,phone_hash,purpose,code_hash,created_at,expires_at,ip_hash,state) VALUES(?,?,?,?,?,?,?,?)',
+                   (ident,server.phone_digest(data['phone']),'register',phone_auth.keyed(vars(server),'sms-code',ident+':'+code),at,at+300000,'synthetic-ip','SENT'))
+    data.update(challengeId=ident,code=code,confirmPassword=data.get('password'),policyVersion=phone_auth.POLICY_VERSION,consentAcceptedAt=at)
+    return data
+
 def seed_legacy_test_fixtures(server):
     with server.connection() as db:
         for ident,sport,unit,count in [('badminton','BADMINTON','场',8),('table-tennis','TABLE_TENNIS','台',10)]:

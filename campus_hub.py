@@ -62,6 +62,7 @@ def initialize(db):
 def authorize_admin(handler, db, module, s):
     user = handler.current_user(db, 'ADMIN')
     role = s.admin_role(user)
+    s.ensure_operator_services_open(db, user)
     if role == 'SUPER_ADMIN':
         return user
     if role == 'CONTENT_OPERATOR' and module in {'summary', 'providers', 'bookings', 'guides', 'secondhand'}:
@@ -239,6 +240,10 @@ def providers(handler,method,ident,query,db,user,s,admin):
     scope = PROVIDER_ROLES.get(s.admin_role(user)) if admin else None
     if query.get('category'):
         require_scope(query['category'], scope)
+        if admin: s.ensure_admin_feature_open(db, user, query['category'])
+    if not admin and query.get('category'):
+        category = choice(query['category'], CATEGORIES, '机构类别')
+        s.ensure_feature_open(db, category, s.SERVICE_FEATURES[category])
     if method == 'GET':
         where, args = ['1=1'], []
         if scope:
@@ -252,7 +257,11 @@ def providers(handler,method,ident,query,db,user,s,admin):
         rows = db.execute('SELECT * FROM campus_providers WHERE '+' AND '.join(where)+' ORDER BY sort_order,created_at,id',args).fetchall()
         if ident:
             if not rows: fail('机构不存在或未发布',404,'NOT_FOUND')
+            if admin: s.ensure_admin_feature_open(db, user, rows[0]['category'])
+            if not admin: s.ensure_feature_open(db, rows[0]['category'], s.SERVICE_FEATURES[rows[0]['category']])
             return provider_view(rows[0]),200
+        if admin: rows = [r for r in rows if s.admin_feature_is_open(db, user, r['category'])]
+        if not admin: rows = [r for r in rows if s.feature_state(db, r['category'])['status'] == 'OPEN']
         return {'items':[provider_view(r) for r in rows]},200
     if not admin:
         fail('需要管理员权限',403,'FORBIDDEN')
@@ -260,6 +269,7 @@ def providers(handler,method,ident,query,db,user,s,admin):
     if ident and not old: fail('机构不存在',404,'NOT_FOUND')
     if old:
         require_scope(old['category'], scope)
+        s.ensure_admin_feature_open(db, user, old['category'])
     if method not in ('POST','PUT','PATCH'):
         fail('请使用下架保留预约记录',405,'METHOD_NOT_ALLOWED')
     data = handler.body_json()
@@ -267,6 +277,7 @@ def providers(handler,method,ident,query,db,user,s,admin):
         data = {**provider_view(old),**data}
     category = choice(data.get('category'),CATEGORIES,'机构类别')
     require_scope(category, scope)
+    s.ensure_admin_feature_open(db, user, category)
     status = choice(data.get('status','DRAFT'),('DRAFT','PUBLISHED','UNLISTED'),'状态')
     details = data.get('details',{})
     if not isinstance(details,dict) or len(dump(details).encode()) > 64*1024:
@@ -311,8 +322,13 @@ def bookings(handler,method,ident,query,db,user,s,admin):
     if category:
         choice(category, CATEGORIES, '机构类别')
         require_scope(category, scope)
+        if admin: s.ensure_admin_feature_open(db, user, category)
     if method=='GET':
         where,args=['1=1'],[]
+        if admin and not s.is_super_admin(user):
+            open_categories = [c for c in CATEGORIES if s.admin_feature_is_open(db, user, c)]
+            where.append('p.category IN (' + ','.join('?' for _ in open_categories) + ')')
+            args.extend(open_categories)
         if not admin: where.append('b.owner_id=?');args.append(user['id'])
         if scope or category:
             where.append('p.category=?');args.append(scope or category)
@@ -342,6 +358,7 @@ def bookings(handler,method,ident,query,db,user,s,admin):
         db.execute('BEGIN IMMEDIATE')
         merchant=db.execute("SELECT * FROM campus_providers WHERE id=? AND status='PUBLISHED' AND booking_enabled=1 AND is_demo=0",(provider,)).fetchone()
         if not merchant: fail('此机构尚未开放预约',409,'BOOKING_UNAVAILABLE')
+        s.ensure_feature_open(db, merchant['category'], s.SERVICE_FEATURES[merchant['category']])
         ident=str(uuid.uuid4()); timestamp=now_ms()
         db.execute('INSERT OR IGNORE INTO campus_bookings(id,owner_id,provider_id,client_id,contact_encrypted,course,preferred_date,note,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
                    (ident,user['id'],provider,client,encrypted(s,contact),course,day,note,timestamp,timestamp))
@@ -355,9 +372,10 @@ def bookings(handler,method,ident,query,db,user,s,admin):
         db.execute('BEGIN IMMEDIATE')
         row=db.execute('SELECT * FROM campus_bookings WHERE id=?',(ident,)).fetchone()
         if not row: fail('预约不存在',404,'NOT_FOUND')
-        if scope:
+        if admin:
             provider = db.execute('SELECT category FROM campus_providers WHERE id=?', (row['provider_id'],)).fetchone()
             require_scope(provider['category'], scope)
+            s.ensure_admin_feature_open(db, user, provider['category'])
         if not admin and (row['owner_id']!=user['id'] or status!='CANCELLED'):
             fail('只能取消自己的预约',403,'FORBIDDEN')
         transitions={'PENDING':{'CONFIRMED','CANCELLED','REJECTED'},'CONFIRMED':{'COMPLETED','CANCELLED'}}
@@ -371,8 +389,10 @@ def bookings(handler,method,ident,query,db,user,s,admin):
 
 def guides(handler,method,ident,db,user,s,admin):
     scope = GUIDE_ROLES.get(s.admin_role(user)) if admin else None
+    if not admin and ident in GUIDES: s.ensure_feature_open(db, ident, s.SERVICE_FEATURES[ident])
     if ident:
         require_scope(ident, scope)
+        if admin: s.ensure_admin_feature_open(db, user, ident)
     if method=='GET':
         rows=db.execute('SELECT * FROM campus_guides'+('' if admin else " WHERE status='PUBLISHED'")).fetchall()
         if scope:
@@ -381,6 +401,8 @@ def guides(handler,method,ident,db,user,s,admin):
             row=next((r for r in rows if r['id']==ident),None)
             if not row: fail('指南尚未发布',404,'NOT_FOUND')
             return dict(row),200
+        if admin: rows = [r for r in rows if s.admin_feature_is_open(db, user, r['id'])]
+        if not admin: rows = [r for r in rows if s.feature_state(db, r['id'])['status'] == 'OPEN']
         return {'items':[dict(r) for r in rows]},200
     if admin and method in ('PUT','PATCH') and ident in GUIDES:
         row=db.execute('SELECT * FROM campus_guides WHERE id=?',(ident,)).fetchone()
@@ -389,9 +411,9 @@ def guides(handler,method,ident,db,user,s,admin):
         if url:
             p=urlsplit(url)
             if p.scheme!='https' or not p.hostname or p.username or p.password: fail('链接必须为 HTTPS 网页')
-        title=text(data,'title',60,True);body=text(data,'body',4000,True)
-        image=image_value(handler,data.get('image',''),[row['image']])
         status=choice(data.get('status'),('DRAFT','PUBLISHED','UNLISTED'),'状态')
+        title=text(data,'title',60,True);body=text(data,'body',4000,status=='PUBLISHED')
+        image=image_value(handler,data.get('image',''),[row['image']])
         db.execute('BEGIN IMMEDIATE')
         db.execute('UPDATE campus_guides SET title=?,body=?,image=?,url=?,status=?,updated_at=? WHERE id=?',(title,body,image,url,status,now_ms(),ident))
         s.write_audit(db,user['id'],'GUIDE_SAVE','GUIDE',ident,{'status':status})
@@ -442,6 +464,7 @@ def route(handler,method,path,query,environment):
         if admin and method=='GET' and module=='catalogue':
             return {'navigation':s.default_app_config()['navigation'],'schoolData':'device-only','removed':sorted(REMOVED)},200
         if module in POST_MODULES:
+            if admin: s.ensure_admin_feature_open(db, user, module)
             if admin and method == 'POST' and not ident:
                 return create_admin_post(handler, module, db, user, s)
             s.ensure_feature_open(db,'lost_found' if module=='lost-found' else 'secondhand','失物招领' if module=='lost-found' else '二手好物') if not admin else None

@@ -54,7 +54,7 @@
       <label>详细说明<textarea name="description" ${market?'required':''} maxlength="${market?1000:300}"></textarea></label>
       ${market?field('wechat','微信号（与电话至少填一项）','text','maxlength="64"')+field('phone','联系电话','tel','maxlength="32"'):field('contact','联系方式','text','required maxlength="60"')}
       <label>图片（${market?'最多4张':'1张'}，每张最多3MB）<input type="file" name="images" accept="image/png,image/jpeg,image/webp" ${market?'multiple':''}></label>
-      <p class="muted">管理员发布后会直接展示在 APP 对应板块，操作会记录到审计日志。</p>
+      <p class="muted">管理员发布后会直接展示在应用对应板块，操作会记录到审计日志。</p>
     </div>`, async form => {
       const files = form.getAll('images').filter(f=>f.size);
       if (files.length > (market?4:1)) throw Error(market?'最多上传4张图片':'只可上传1张图片');
@@ -64,7 +64,7 @@
       if (market) body.images = images;
       else {body.image = images[0] || ''; body.time = '';}
       await api('/api/v1/admin/campus/' + module, {method:'POST', body});
-      toast('已发布，APP 刷新对应板块后可见');
+      toast('已发布，应用刷新对应板块后可见');
       await navigate(market?'marketplace':'communityLost', state.filters);
     }, '确认发布');
   }

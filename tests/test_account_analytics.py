@@ -155,3 +155,33 @@ class AccountAnalyticsTest(unittest.TestCase):
         with urllib.request.urlopen(self.base+'/admin/account-analytics.js') as response:
             self.assertEqual(200,response.status)
             self.assertIn(b'renderers.analytics',response.read())
+
+    def test_ios_current_consent_metadata_validation_and_admin_device_view(self):
+        user = self.account(self.owner)
+        payload = {'installationId':'synthetic-ios-current','versionName':'1.0.0','versionCode':12,
+                   'consentVersion':4,'policyVersion':'2026-10-23','consentAcceptedAt':server.now_ms()-1000,
+                   'platform':'ios','manufacturer':'Apple','model':'iPhone17,3','osVersion':'26.0'}
+        for changes in [{'consentAcceptedAt':True},{'consentAcceptedAt':server.now_ms()+600000},
+                        {'policyVersion':'old'},{'versionCode':True},{'deviceName':'Private phone'},
+                        {'imei':'forbidden'},{'schoolPassword':'forbidden'}]:
+            self.assertEqual(422,self.call('POST','/api/v1/activity/foreground',{**payload,**changes},self.owner)[0])
+        for _ in range(2):
+            code,data = self.call('POST','/api/v1/activity/foreground',payload,self.owner)
+            self.assertEqual(200,code,data)
+        path = '/api/v1/admin/account-analytics/devices?platform=ios'
+        code,data = self.call('GET',path,token=self.admin)
+        self.assertEqual(200,code,data)
+        self.assertEqual(1,data['data']['total'])
+        row = data['data']['items'][0]
+        self.assertEqual('iPhone17,3',row['model'])
+        self.assertEqual(12,row['app_build'])
+        self.assertEqual(payload['consentAcceptedAt'],row['consent_accepted_at'])
+        self.assertEqual('2026-10-23',row['policy_version'])
+        self.assertGreaterEqual(row['consent_received_at'],row['consent_accepted_at'])
+        self.assertNotIn('installation_id',row)
+        self.assertNotIn('deviceScopedId',row)
+        for token in [self.owner,self.identity('ADMIN','LIBRARY_OPERATOR'),self.identity('ADMIN','CONTENT_OPERATOR')]:
+            self.assertEqual(403,self.call('GET',path,token=token)[0])
+        with server.connection() as db:
+            analytics.forget(db,user)
+        self.assertEqual(0,self.call('GET',path,token=self.admin)[1]['data']['total'])

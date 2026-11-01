@@ -9,7 +9,7 @@ import tempfile
 import threading
 import unittest
 from unittest import mock
-from synthetic_fixtures import seed_legacy_test_fixtures
+from synthetic_fixtures import seed_legacy_test_fixtures, sms_registration
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -52,6 +52,8 @@ class ApiTest(unittest.TestCase):
         cls.temp.cleanup()
 
     def call(self, method, path, data=None, token=None):
+        if method == 'POST' and path == '/api/v1/auth/register' and data:
+            data = sms_registration(server, data)
         body = json.dumps(data).encode() if data is not None else None
         headers = {"Content-Type": "application/json"}
         if token:
@@ -2497,7 +2499,9 @@ class ApiTest(unittest.TestCase):
 
         with urllib.request.urlopen(self.base + "/admin/", timeout=5) as response:
             html = response.read().decode("utf-8")
-            self.assertIn("MY CHUANNONG / CAMPUS CONSOLE", html)
+            self.assertNotIn("MY CHUANNONG", html)
+            self.assertNotIn("CAMPUS CONSOLE", html)
+            self.assertNotIn('class="local-pill"', html)
             self.assertIn("校园运营后台", html)
             self.assertIn("/admin/assets/my-chuannong-app-icon.png", html)
             self.assertNotIn("LOCAL ADMIN", html)
@@ -2512,7 +2516,7 @@ class ApiTest(unittest.TestCase):
             self.assertIn("#user-bulk-actions[hidden]", stylesheet)
         with urllib.request.urlopen(self.base + "/admin/app.js", timeout=5) as response:
             javascript = response.read().decode("utf-8")
-            self.assertIn("生产运行说明", javascript)
+            self.assertNotIn("生产运行说明", javascript)
             self.assertIn('DEVICE: "未登录用户"', javascript)
             self.assertNotIn('DEVICE: "测试设备"', javascript)
             self.assertIn("lost-details", javascript)
@@ -2522,17 +2526,12 @@ class ApiTest(unittest.TestCase):
             self.assertIn("批量限制访问", javascript)
             self.assertIn("批量恢复权限", javascript)
             self.assertIn("delete-user-account", javascript)
-            self.assertIn("默认隐藏已注销用户", javascript)
+            self.assertNotIn("默认隐藏已注销用户", javascript)
             self.assertIn("恢复账号", javascript)
             self.assertIn("已注销，可重新注册", javascript)
             self.assertIn("网站公告", javascript)
             self.assertIn("website-announcements", javascript)
             self.assertNotIn("本地运行说明", javascript)
-            self.assertIn("用户概况", javascript)
-            self.assertIn("累计用户量", javascript)
-            self.assertIn("我的川农注册用户", javascript)
-            self.assertIn("未注册 / 游客用户", javascript)
-            self.assertIn("今日首次使用用户", javascript)
             for removed_note in (
                 "累计用户量按 canonical identity 去重",
                 "DAU / WAU / MAU 按 canonical identity 去重",

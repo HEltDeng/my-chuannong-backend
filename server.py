@@ -52,7 +52,11 @@ from runtime_config import RUNTIME
 from security import RateLimiter
 import campus_hub
 import notification_follows
+import ios_release
+import qq_group
 import account_analytics
+import student_presence
+import phone_auth
 
 ROOT = Path(__file__).resolve().parent
 UPLOADS = RUNTIME.upload_path
@@ -97,7 +101,44 @@ ROLE_PERMISSIONS = {
     "LIBRARY_OPERATOR": {"LIBRARY_VIEW", "LIBRARY_MANAGE", "LIBRARY_PII_VIEW"},
     "CONTENT_OPERATOR": {"CONTENT_VIEW", "CONTENT_MANAGE"},
 }
-CONTROLLED_FEATURES = {"sports_reservation", "lost_found", "resource_library", "secondhand"}
+SERVICE_FEATURES = {
+    "resource_library": "资料库", "secondhand": "二手好物", "lost_found": "失物招领",
+    "errand": "跑腿代取", "logistics_repair": "后勤报修", "electric": "电费查询",
+    "driving_school": "驾校", "ielts_toefl": "雅思托福", "civil_postgrad": "考公考研", "gym": "健身房",
+}
+CONTROLLED_FEATURES = set(SERVICE_FEATURES) | {"sports_reservation"}
+SERVICE_STATES = {"OPEN", "MAINTENANCE", "COMING_SOON", "CLOSED"}  # CLOSED: old clients/configs
+
+def service_features_for_role(role):
+    if role == "SUPER_ADMIN": return set(CONTROLLED_FEATURES)
+    if role == "CONTENT_OPERATOR": return set(SERVICE_FEATURES) - {"lost_found", "resource_library"}
+    module = ANNOUNCEMENT_ROLES.get(role)
+    key = {"resources": "resource_library", "lost-found": "lost_found"}.get(module, module)
+    return {key} if key in SERVICE_FEATURES else set()
+
+
+def admin_feature_is_open(db, user, module):
+    key = {"resources": "resource_library", "lost-found": "lost_found"}.get(module, module)
+    return is_super_admin(user) or key not in CONTROLLED_FEATURES or feature_state(db, key)["status"] == "OPEN"
+
+
+def ensure_admin_feature_open(db, user, module):
+    if not admin_feature_is_open(db, user, module):
+        raise ApiError(403, "ADMIN_SERVICE_CLOSED", "关闭")
+
+
+def ensure_operator_services_open(db, user):
+    """A closed module freezes its operator; the super admin can repair/reopen it."""
+    role = admin_role(user)
+    if role == "SUPER_ADMIN":
+        return
+    module = ANNOUNCEMENT_ROLES.get(role)
+    key = {"resources": "resource_library", "lost-found": "lost_found"}.get(module, module)
+    if role == "SPORTS_OPERATOR":
+        key = "sports_reservation"
+    if key and feature_state(db, key)["status"] != "OPEN":
+        raise ApiError(403, "ADMIN_SERVICE_CLOSED", "关闭")
+
 DEFAULT_DEVICE_NICKNAME = "川农同学"
 OFFICIAL_PACKAGE_NAME = "com.mychuannong.app"
 # No inherited signing identity. Publishing requires an explicitly configured
@@ -1141,6 +1182,8 @@ def initialize_database() -> None:
         db.executescript((ROOT / "schema.sql").read_text(encoding="utf-8"))
         campus_hub.initialize(db)
         notification_follows.initialize(db)
+        ios_release.initialize(db)
+        qq_group.initialize(db)
         ensure_default_app_config(db)
         ensure_column(db, "venues", "operating_status", "TEXT NOT NULL DEFAULT 'OPEN'")
         ensure_column(db, "venues", "maintenance_note", "TEXT NOT NULL DEFAULT ''")
@@ -1250,7 +1293,9 @@ def initialize_database() -> None:
             "TEXT NOT NULL DEFAULT 'OPTIONAL'",
         )
         db.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_phone_hash ON users(phone_hash) WHERE phone_hash IS NOT NULL")
+        phone_auth.initialize(db)
         account_analytics.initialize(db)
+        student_presence.initialize(db)
         db.execute(
             """UPDATE users SET account_type=CASE
                WHEN role='ADMIN' THEN 'ADMIN'
@@ -1392,6 +1437,9 @@ def initialize_database() -> None:
                    ON CONFLICT(key) DO NOTHING""",
                 (key, enabled, timestamp),
             )
+        for key in SERVICE_FEATURES:
+            db.execute("INSERT OR IGNORE INTO remote_flags(key,enabled,payload_json,updated_at) VALUES(?,1,?,?)",
+                       (key, json.dumps({"status":"OPEN","maintenanceNote":"","expectedRestoreAt":None}), timestamp))
         db.execute(
             """INSERT INTO reservation_rules(
                    id,max_active_per_day,max_user_cancellations_per_day,
@@ -1933,6 +1981,11 @@ def full_admin_user_row(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
     data = dict(row)
     encrypted = data.pop("phone_encrypted", None)
     data["phone"] = decrypt_phone(encrypted) if encrypted else None
+    identity = phone_auth.identity_fields(data, globals())
+    data.update(student_id=identity['studentId'], real_name=identity['realName'],
+                identity_status=identity['identityStatus'], phone_verified=identity['phoneVerified'])
+    for key in ('identity_encrypted', 'student_identity_hash', 'identity_name_hash'):
+        data.pop(key, None)
     return data
 
 
@@ -2006,6 +2059,8 @@ def require_admin_path_access(user: sqlite3.Row, method: str, path: str) -> None
     if not bool(user["admin_enabled"]):
         raise ApiError(403, "ADMIN_DISABLED", "管理员账号已停用")
     allowed = False
+    if method == "GET" and path == "/api/v1/admin/service-availability" and service_features_for_role(role):
+        return
     if role in ANNOUNCEMENT_ROLES and re.fullmatch(r"/api/v1/admin/announcements(?:/[^/]+)?", path):
         return
     if role == "SPORTS_OPERATOR":
@@ -2077,15 +2132,15 @@ def append_user_search(
         return
     if re.fullmatch(r"[A-Za-z0-9_-]{6,32}", compact):
         clauses.append(
-            f"({alias}.reservation_student_id_hash=? OR {alias}.id=?)"
+            f"({alias}.reservation_student_id_hash=? OR {alias}.student_identity_hash=? OR {alias}.id=?)"
         )
         values.extend(
-            [reservation_pii_digest("student-id", compact), compact]
+            [reservation_pii_digest("student-id", compact), phone_auth.keyed(globals(), 'student:SICAU', compact.upper()), compact]
         )
         return
     if 2 <= len(term) <= 40 and re.fullmatch(r"[\u3400-\u9fff·.\- ]+", term):
-        clauses.append(f"{alias}.reservation_name_hash=?")
-        values.append(reservation_pii_digest("real-name", term))
+        clauses.append(f"({alias}.reservation_name_hash=? OR {alias}.identity_name_hash=?)")
+        values.extend([reservation_pii_digest("real-name", term), phone_auth.keyed(globals(), 'student-name', term)])
         return
     token = f"%{term}%"
     clauses.append(
@@ -2237,13 +2292,14 @@ def migrate_device_data(
 
 def serialize_user(user: sqlite3.Row) -> dict[str, Any]:
     return {
+        **phone_auth.identity_fields(user, globals()),
         "id": user["id"],
         "role": user["role"],
         "accountType": user["account_type"],
         "userCode": user["user_code"],
         "nickname": user["nickname"],
         "phoneMasked": user["phone_masked"],
-        # Academic-system identity is deliberately not part of the MyChuannong account API.
+        # School passwords and sessions never enter this API.
         "reservationStudentId": user["reservation_student_id"],
         "reservationName": user["reservation_name"],
         "reservationProfileConsentedAt": user["reservation_profile_consented_at"],
@@ -2488,6 +2544,7 @@ def delete_user_account_data(
         raise ApiError(409, "ADMIN_ACCOUNT_PROTECTED", "管理员账号不能通过用户删除流程处理")
 
     user_id = user["id"]
+    phone_auth.forget(db, user)
     timestamp = now_ms()
     normalized_reason = reason.strip()[:300] or "账号删除"
     image_names = [
@@ -2514,6 +2571,7 @@ def delete_user_account_data(
     db.execute("DELETE FROM campus_bookings WHERE owner_id=?", (user_id,))
     db.execute("DELETE FROM notification_follows WHERE user_id=?", (user_id,))
     account_analytics.forget(db, user_id)
+    student_presence.forget(db, user_id)
     db.execute("DELETE FROM marketplace_notifications WHERE owner_id=?", (user_id,))
     db.execute("DELETE FROM marketplace_deleted_posts WHERE owner_id=?", (user_id,))
     db.execute("DELETE FROM lostfound_review_notifications WHERE owner_id=?", (user_id,))
@@ -2687,7 +2745,7 @@ def feature_state(db: sqlite3.Connection, key: str) -> dict[str, Any]:
     except (TypeError, json.JSONDecodeError):
         payload = {}
     status = str(payload.get("status", "OPEN")).upper()
-    if status not in {"OPEN", "CLOSED", "MAINTENANCE"}:
+    if status not in SERVICE_STATES:
         status = "OPEN"
     if not bool(row["enabled"]):
         status = "CLOSED"
@@ -2710,6 +2768,8 @@ def ensure_feature_open(db: sqlite3.Connection, key: str, label: str) -> None:
     if state["status"] == "MAINTENANCE":
         note = state["maintenanceNote"] or f"{label}维护中，请稍后再试"
         raise ApiError(503, "FEATURE_MAINTENANCE", note)
+    if state["status"] == "COMING_SOON":
+        raise ApiError(503, "FEATURE_COMING_SOON", state["maintenanceNote"] or f"{label}即将上线")
     note = state["maintenanceNote"] or f"{label}暂不开放"
     raise ApiError(503, "FEATURE_CLOSED", note)
 
@@ -3094,7 +3154,7 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def send_admin_asset(self, path: str) -> None:
         relative = "index.html" if path in {"/admin", "/admin/"} else path.removeprefix("/admin/")
-        allowed_assets = {"index.html", "app.js", "campus.js", "marketplace.js", "lostfound-review.js", "module-operations.js", "account-analytics.js", "marketplace.css", "styles.css", "assets/my-chuannong-app-icon.png"}
+        allowed_assets = {"index.html", "app.js", "campus.js", "marketplace.js", "lostfound-review.js", "module-operations.js", "account-analytics.js", "ios-release.js", "service-availability.js", "qq-group.js", "marketplace.css", "styles.css", "assets/my-chuannong-app-icon.png"}
         if relative not in allowed_assets:
             raise ApiError(404, "NOT_FOUND", "管理后台资源不存在")
         target = (ADMIN_WEB / relative).resolve()
@@ -3167,8 +3227,18 @@ class ApiHandler(BaseHTTPRequestHandler):
             return {"status": "ready"}, 200
         if method == "POST" and path == "/api/v1/auth/device":
             return self.auth_device(), 200
+        if method == "GET" and path == "/api/v1/auth/capabilities":
+            return phone_auth.capabilities(), 200
         if method == "POST" and path == "/api/v1/auth/register":
             return self.auth_register(), 201
+        if method == "POST" and path == "/api/v1/auth/sms-code":
+            return phone_auth.request_code(self, globals()), 200
+        if method == "POST" and path == "/api/v1/auth/reset-password":
+            return phone_auth.reset_password(self, globals()), 200
+        if method == "POST" and path == "/api/v1/auth/verify-phone":
+            return phone_auth.verify_phone(self, globals()), 200
+        if method == "PUT" and path == "/api/v1/auth/student-identity":
+            return phone_auth.bind_identity(self, globals()), 200
         if method == "POST" and path == "/api/v1/auth/login":
             return self.auth_login(), 200
         if method == "POST" and path == "/api/v1/auth/logout":
@@ -3253,10 +3323,16 @@ class ApiHandler(BaseHTTPRequestHandler):
         match = re.fullmatch(r"/api/v1/library/([^/]+)/complaints", path)
         if match and method == "POST":
             return self.library_complaint(match.group(1)), 201
+        if (method == 'GET' and path == '/api/v1/public/ios-release') or (method in {'GET', 'PUT'} and path == '/api/v1/admin/ios-release'):
+            return ios_release.route(self, method, path, connection, write_audit)
+        if path in {'/api/v1/public/qq-group', '/api/v1/admin/qq-group'}:
+            return qq_group.route(self, method, path, connection, write_audit)
         if method == "GET" and path == "/api/v1/public/bootstrap":
             return self.public_bootstrap(query), 200
         if path.startswith("/api/v1/notifications/"):
             return notification_follows.route(self, method, path, connection)
+        if method == 'POST' and path == '/api/v1/activity/student-session':
+            return student_presence.receive(self, globals())
         if method == 'POST' and path == '/api/v1/activity/foreground':
             return account_analytics.receive(self, connection, record_device_identity)
         if method == "GET" and path == "/api/v1/public/website-announcements":
@@ -3320,14 +3396,17 @@ class ApiHandler(BaseHTTPRequestHandler):
             3,
             300,
         )
-        password = required_text(data, "password", 200)
-        if len(password) < 8:
-            raise ApiError(400, "WEAK_PASSWORD", "密码至少 8 位")
+        phone_auth.consent(data)
+        password = phone_auth.confirmed_password(data)
+        if data.get('installationId') and len(str(data['installationId'])) > 100:
+            raise ApiError(422, 'INVALID_INSTALLATION_ID', '安装标识无效')
         nickname = str(data.get("nickname", "川农同学")).strip()[:30] or "川农同学"
         digest_phone = phone_digest(phone)
         username = "phone_" + digest_phone[:32]
         digest, salt = password_record(password)
         with connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            phone_auth.consume(db, data, digest_phone, 'register', globals())
             user_id = str(uuid.uuid4())
             created_at = now_ms()
             try:
@@ -3352,6 +3431,9 @@ class ApiHandler(BaseHTTPRequestHandler):
                 )
             except sqlite3.IntegrityError as exc:
                 raise ApiError(409, "PHONE_EXISTS", "该账号已存在，请直接登录") from exc
+            db.execute('UPDATE users SET phone_verified_at=? WHERE id=?', (created_at, user_id))
+            phone_auth.save_consent(db, user_id, data)
+            db.commit()
             migrated = migrate_device_data(
                 db, str(data.get("installationId", "")).strip() or None, user_id
             )
@@ -4448,6 +4530,9 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def public_bootstrap(self, query: dict[str, str] | None = None) -> dict[str, Any]:
         query = query or {}
+        platform = query.get("platform", "android")
+        if platform not in {"android", "ios"}:
+            raise ApiError(422, "INVALID_PLATFORM", "客户端平台无效")
         wants_dynamic_config = (
             str(query.get("schemaVersion", "")) == str(APP_CONFIG_SCHEMA_VERSION)
             and str(query.get("appVersionCode", "")).isdigit()
@@ -4504,6 +4589,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
             payload = {
                 "flags": flags,
+                "qqGroup": qq_group.public_state(db),
                 "announcements": announcements,
                 "version": version,
                 "releaseMetadata": (
@@ -4511,15 +4597,19 @@ class ApiHandler(BaseHTTPRequestHandler):
                 ),
                 "updatePolicy": policy,
             }
+            if platform == "ios":
+                payload["version"] = None
+                payload["releaseMetadata"] = None
+                payload["updatePolicy"] = ios_release.public_state(db)
             if wants_dynamic_config:
                 config_row = active_app_config(db)
                 if config_row:
                     app_version = int(query["appVersionCode"])
                     min_code = int(config_row["min_app_version_code"])
                     max_code = config_row["max_app_version_code"]
-                    compatible = app_version >= min_code and (
+                    compatible = platform == "ios" or (app_version >= min_code and (
                         max_code is None or app_version <= int(max_code)
-                    )
+                    ))
                     if compatible:
                         payload.update(
                             {
@@ -4927,6 +5017,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             admin = self.current_user(db, "ADMIN")
             try:
                 require_admin_path_access(admin, method, path)
+                if path != "/api/v1/admin/service-availability":
+                    ensure_operator_services_open(db, admin)
             except ApiError:
                 write_audit(
                     db,
@@ -4938,10 +5030,21 @@ class ApiHandler(BaseHTTPRequestHandler):
                 )
                 raise
 
+            if method == 'GET' and path == '/api/v1/admin/account-directory':
+                return student_presence.directory(db, query, globals()), 200
+            if method == 'GET' and path == '/api/v1/admin/account-directory/metrics':
+                return student_presence.metrics(db, globals()), 200
             if method == 'GET' and path == '/api/v1/admin/account-analytics':
                 return account_analytics.summary(db, query), 200
+            if method == 'GET' and path == '/api/v1/admin/account-analytics/devices':
+                return student_presence.devices(db, query, globals()), 200
             if method == 'GET' and path == '/api/v1/admin/account-analytics/accounts':
                 return account_analytics.accounts(db, query, serialize_user), 200
+            if method == 'GET' and path == '/api/v1/admin/phone-auth':
+                return phone_auth.stats(db), 200
+            identity_review = re.fullmatch(r'/api/v1/admin/users/([^/]+)/student-review', path)
+            if method == 'POST' and identity_review:
+                return phone_auth.review_identity(db, identity_review.group(1), admin['id'], self.body_json(), globals()), 200
 
             if method == "GET" and path.startswith("/api/v1/admin/overview/"):
                 today = date.today().isoformat()
@@ -5140,6 +5243,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     clauses.append("EXISTS (SELECT 1 FROM risk_candidates rc WHERE rc.user_id=u.id AND rc.status IN ('OPEN','WATCHING'))")
                 where_sql = " AND ".join(clauses)
                 select_sql = """SELECT u.id,u.user_code,u.account_type,u.nickname,u.phone_masked,u.phone_encrypted,
+                                  u.identity_encrypted,u.identity_status,u.phone_verified_at,
                                   u.reservation_student_id,u.reservation_name,
                                   u.reservation_profile_consented_at,
                                   u.account_status,u.account_status_reason,
@@ -5186,6 +5290,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             if method == "GET" and match:
                 user = db.execute(
                     """SELECT id,user_code,account_type,nickname,phone_masked,phone_encrypted,
+                              identity_encrypted,identity_status,phone_verified_at,
                               reservation_student_id,reservation_name,
                               reservation_profile_consented_at,
                               reservation_profile_version,
@@ -5199,7 +5304,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 if not user:
                     raise ApiError(404, "USER_NOT_FOUND", "用户不存在")
                 return {
-                    "user": full_admin_user_row(user),
+                    "user": {**full_admin_user_row(user), **student_presence.account_fields(db, user["id"], globals())},
                     "reservations": [
                         mask_admin_reservation_row(row)
                         for row in db.execute(
@@ -6773,6 +6878,7 @@ class ApiHandler(BaseHTTPRequestHandler):
 
             if method == "GET" and path == "/api/v1/admin/announcements":
                 module = announcement_scope(admin_role(admin), query.get("module") or None)
+                if module: ensure_admin_feature_open(db, admin, module)
                 rows = db.execute(
                     "SELECT * FROM announcements" + (" WHERE module_id=?" if module else "")
                     + " ORDER BY sort_order ASC, published_at DESC",
@@ -6786,7 +6892,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                         "notificationEnabled": bool(row["notification_enabled"]),
                         "popupEnabled": bool(row["popup_enabled"]),
                     }
-                    for row in rows
+                    for row in rows if admin_feature_is_open(db, admin, row["module_id"])
                 ], 200
 
             if method == "GET" and path == "/api/v1/admin/website-announcements":
@@ -6884,6 +6990,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             if method == "POST" and path == "/api/v1/admin/announcements":
                 data = self.body_json()
                 module = announcement_scope(admin_role(admin), data.get("module")) or "general"
+                ensure_admin_feature_open(db, admin, module)
                 announcement_id = str(uuid.uuid4())
                 timestamp = now_ms()
                 service_visible = 1 if bool(data.get("serviceVisible", True)) else 0
@@ -6938,6 +7045,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 if not current:
                     raise ApiError(404, "ANNOUNCEMENT_NOT_FOUND", "公告不存在")
                 announcement_scope(admin_role(admin), current["module_id"])
+                ensure_admin_feature_open(db, admin, current["module_id"])
                 if "module" in data and data["module"] != current["module_id"]:
                     raise ApiError(422, "VALIDATION_ERROR", "编辑时不能更改公告所属板块")
                 title = str(data.get("title", current["title"])).strip()[:100]
@@ -7002,6 +7110,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 if not current:
                     raise ApiError(404, "ANNOUNCEMENT_NOT_FOUND", "公告不存在")
                 announcement_scope(admin_role(admin), current["module_id"])
+                ensure_admin_feature_open(db, admin, current["module_id"])
                 changed = db.execute(
                     "DELETE FROM announcements WHERE id=?", (match.group(1),)
                 ).rowcount
@@ -7015,6 +7124,15 @@ class ApiHandler(BaseHTTPRequestHandler):
                     match.group(1),
                 )
                 return {"id": match.group(1), "deleted": True}, 200
+
+            if method == "GET" and path == "/api/v1/admin/service-availability":
+                allowed = service_features_for_role(admin_role(admin))
+                items = []
+                for key, title in SERVICE_FEATURES.items():
+                    if key not in allowed: continue
+                    state = feature_state(db, key)
+                    items.append({**state, "title": title})
+                return {"items": items, "canManage": is_super_admin(admin)}, 200
 
             if method == "GET" and path == "/api/v1/admin/config":
                 flags = []
@@ -7269,18 +7387,28 @@ class ApiHandler(BaseHTTPRequestHandler):
 
             match = re.fullmatch(r"/api/v1/admin/flags/([^/]+)", path)
             if method == "PUT" and match:
-                require_admin_permission(admin, "*")
                 feature_key = match.group(1)
                 if feature_key not in CONTROLLED_FEATURES:
                     raise ApiError(404, "FEATURE_NOT_FOUND", "功能开关不存在")
+                if not is_super_admin(admin):
+                    raise ApiError(403, "ADMIN_MODULE_FORBIDDEN", "仅超级管理员可以修改板块状态")
                 data = self.body_json()
                 payload = data.get("payload", {})
                 if not isinstance(payload, dict):
                     raise ApiError(400, "VALIDATION_ERROR", "功能开关配置必须是对象")
                 status = str(payload.get("status", "OPEN")).upper()
-                if status not in {"OPEN", "CLOSED", "MAINTENANCE"}:
+                if status not in SERVICE_STATES:
                     raise ApiError(400, "VALIDATION_ERROR", "功能运行状态无效")
+                expected = payload.get("expectedRestoreAt")
+                if expected is not None and (type(expected) is not int or not 0 < expected <= 253402300799999):
+                    raise ApiError(400, "VALIDATION_ERROR", "预计时间必须为有效的毫秒时间戳")
+                note = payload.get("maintenanceNote", "")
+                if not isinstance(note, str) or len(note) > 300:
+                    raise ApiError(400, "VALIDATION_ERROR", "用户提示最多 300 字")
+                previous_payload_row = db.execute("SELECT payload_json FROM remote_flags WHERE key=?", (feature_key,)).fetchone()
+                previous_payload = json.loads(previous_payload_row[0] or "{}") if previous_payload_row else {}
                 payload = {
+                    **previous_payload,
                     **payload,
                     "status": status,
                     "maintenanceNote": str(payload.get("maintenanceNote", "")).strip()[:300],

@@ -48,9 +48,9 @@ const titles = {
   resources: "资料管理",
   resourceComplaints: "资料投诉 / 举报处理",
   resourceActivity: "资料库用户记录",
-  announcements: "APP 公告",
+  announcements: "应用公告",
   websiteAnnouncements: "网站公告",
-  config: "版本与功能开关",
+  config: "版本与配置",
   feedback: "用户反馈",
   riskCandidates: "异常候选",
   userEvents: "用户行为记录",
@@ -124,7 +124,8 @@ function statusText(value) {
   return {
     OPEN: "开放",
     CLOSED: "关闭",
-    MAINTENANCE: "维护",
+    MAINTENANCE: "维护中",
+    COMING_SOON: "即将上线",
     ACTIVE: "已预约",
     CANCELLED: "已取消",
     NOT_REQUIRED: "无需核验",
@@ -424,7 +425,7 @@ async function showApp() {
     state.page = requestedButton ? requestedPage : moduleHome(role) || "overview";
     const activePage = document.querySelector(`#nav button[data-page="${CSS.escape(state.page)}"]`);
     if (!activePage || activePage.classList.contains("hidden")) state.page = "overview";
-    $("#admin-identity").textContent = `当前管理员：${state.admin.nickname || state.admin.id} · ${roleLabels[role] || role}`;
+    $("#admin-identity").textContent = [state.admin.nickname, roleLabels[role]].filter((value, index, values) => value && values.indexOf(value) === index).join(" · ");
     $("#login-view").classList.add("hidden");
     $("#app-view").classList.remove("hidden");
     await navigate(state.page);
@@ -445,12 +446,20 @@ async function navigate(page, filters = {}) {
   });
   content.innerHTML = '<div class="empty">正在读取数据…</div>';
   try {
+    if (operatorAnnouncementModule(state.admin.adminRole)) {
+      const status = await api('/api/v1/admin/service-availability');
+      const own = operatorAnnouncementModule(state.admin.adminRole);
+      if (own && status.items.some(item => item.status !== 'OPEN')) {
+        content.innerHTML = '<div class="empty"><strong>关闭</strong></div>';
+        return;
+      }
+    }
     await renderers[page](filters);
     if (page === "overview" && state.overviewScrollY) {
       requestAnimationFrame(() => window.scrollTo(0, state.overviewScrollY));
     }
   } catch (error) {
-    const title = error.status === 403 ? "无权限访问" : "读取失败";
+    const title = error.message === "关闭" ? "关闭" : error.status === 403 ? "无权限访问" : "读取失败";
     content.innerHTML = `<div class="empty"><strong>${title}</strong><br>${escapeHtml(error.message)}<br><button class="ghost" data-action="reload">重新加载</button></div>`;
   }
 }
@@ -482,27 +491,6 @@ const renderers = {
     const todayFirstUseUsers = data.todayFirstUseUsers ?? data.todayNewUsers ?? 0;
     const asOf = String(data.asOf || Date.now());
     const groups = [
-      ["用户概况", [
-        ["累计用户量", data.totalUsers, "canonicalUsers", {cohort:"all",title:"累计用户量"}], ["我的川农注册用户", data.registeredUsers, "users", {accountType:"PHONE",includeDeleted:"true"}],
-        ["未注册 / 游客用户", data.guestUsers, "canonicalUsers", {cohort:"guest",title:"未注册 / 游客用户"}], ["今日新增用户", data.todayNewUsers, "canonicalUsers", {firstSeen:"today",title:"今日新增用户"}],
-        ["今日新增注册", todayNewRegistrations, "users", {createdToday:"true",accountType:"PHONE",includeDeleted:"true"}],
-      ]],
-      ["活跃情况", [
-        ["最近 5 分钟活跃用户", data.active5m, "canonicalUsers", {activity:"5m",asOf,title:"最近 5 分钟活跃用户"}], ["今日活跃用户（DAU）", data.dau, "canonicalUsers", {activity:"today",asOf,title:"今日活跃用户（DAU）"}],
-        ["近 7 日活跃用户（WAU）", data.wau, "canonicalUsers", {activity:"7d",asOf,title:"近 7 日活跃用户（WAU）"}], ["近 30 日活跃用户（MAU）", data.mau, "canonicalUsers", {activity:"30d",asOf,title:"近 30 日活跃用户（MAU）"}],
-        ["今日首次使用用户", todayFirstUseUsers, "canonicalUsers", {firstSeen:"today",title:"今日首次使用用户"}],
-      ]],
-      ["我的川农账号", [
-        ["累计注册账号", data.registeredAccounts, "users", {accountType:"PHONE",includeDeleted:"true"}], ["正常账号", data.activeAccounts, "users", {status:"ACTIVE",accountType:"PHONE"}],
-        ["受限账号", data.limitedAccounts, "users", {status:"LIMITED",accountType:"PHONE"}], ["已禁用账号", data.disabledAccounts, "users", {status:"DISABLED",accountType:"PHONE"}],
-        ["已注销账号", data.deletedAccounts, "users", {status:"DELETED",accountType:"PHONE"}],
-      ]],
-      ["设备与安装实例", [
-        ["累计独立设备", data.totalDevices, "devices", {window:"all",title:"累计独立设备"}], ["今日新增设备", data.todayNewDevices, "devices", {window:"today",title:"今日新增设备"}],
-        ["最近 5 分钟活跃设备", data.activeDevices, "devices", {window:"5m",asOf,title:"最近 5 分钟活跃设备"}], ["近 7 日活跃设备", data.activeDevices7d, "devices", {window:"7d",asOf,title:"近 7 日活跃设备"}],
-        ["近 30 日活跃设备", data.activeDevices30d, "devices", {window:"30d",asOf,title:"近 30 日活跃设备"}], ["累计安装实例", data.totalInstallations, "installations", {window:"all",title:"累计安装实例"}],
-        ["今日新增安装", data.todayNewInstallations, "installations", {window:"today",title:"今日新增安装"}], ["累计重新安装", data.reinstallations, "installations", {reinstallation:"true",title:"累计重新安装"}],
-      ]],
       ["业务与处理", [
         ["体育预约 · 当前有效预约", data.activeReservations, "reservations", {status:"ACTIVE"}], ["体育预约 · 今日有效预约", data.todayReservations, "reservations", {date:new Date().toISOString().slice(0,10),status:"ACTIVE"}],
         ["体育预约 · 今日取消预约", data.todayCancelledReservations, "reservations", {cancelledToday:"true",status:"CANCELLED"}],
@@ -519,14 +507,11 @@ const renderers = {
       ${groups.map(([title, metrics]) => `<h3 class="section-title">${title}</h3><div class="grid metric-grid">
         ${metrics.map(([label, value, page, filter]) => page ? `<button class="card metric metric-link" data-action="metric-nav" data-page="${page}" data-filter="${escapeHtml(JSON.stringify(filter))}"><span>${label}</span><strong>${value}</strong></button>` : `<div class="card metric"><span>${label}</span><strong>${value}</strong></div>`).join("")}
       </div>`).join("")}
-      <article class="card section-title">
-        <h3>生产运行说明</h3>
-        <p class="muted">这里的修改会通过生产 API 写入生产数据库。App 刷新对应页面后即可看到最新状态。</p>
-      </article>`;
+`;
   },
 
   async users(filters = {}) {
-    const normalized = {...filters};
+    const normalized = {accountType: "PHONE", ...filters};
     const now = Date.now();
     if (normalized.activeWindow) {
       normalized.activeSince = normalized.activeWindow === "5m" ? now - 300000 : normalized.activeWindow === "dau" ? new Date().setHours(0,0,0,0) : normalized.activeWindow === "wau" ? now - 7*86400000 : now - 30*86400000;
@@ -543,16 +528,16 @@ const renderers = {
     content.innerHTML = `
       ${summary}
       <form id="user-filter" class="toolbar">
-        <label>搜索<input name="q" value="${escapeHtml(filters.q || "")}" placeholder="手机号、昵称、用户编号、内部 UUID、预约学号或姓名"></label>
-        <label class="compact">账号类型<select name="accountType"><option value="">全部</option>${options(["PHONE","DEVICE"], filters.accountType)}</select></label>
+        <label>搜索<input name="q" value="${escapeHtml(filters.q || "")}" placeholder="手机号、学号或姓名"></label>
+        <label class="compact">账号类型<select name="accountType"><option value="">全部</option>${options(["PHONE","DEVICE"], normalized.accountType)}</select></label>
         <label class="compact">状态<select name="status">${accountStatusFilterOptions(filters.status)}</select></label>
         <button class="primary">筛选</button>
       </form>
-      <p class="muted">共 ${result.total} 个账号。默认隐藏已注销用户；选择“已注销”可单独查询。</p>
-      ${rows.length ? `<div id="user-bulk-actions" class="toolbar" hidden><strong data-selected-user-count>已选择 0 个用户</strong><button type="button" class="danger" data-action="bulk-purge-users" hidden>永久删除所选已注销账号</button><button type="button" class="danger" data-action="bulk-delete-users">注销账号</button><button type="button" class="primary" data-action="bulk-limit-users">批量限制访问</button><button type="button" class="ghost" data-action="bulk-restore-users">批量恢复权限</button><span class="muted">管理员账号不属于此列表，也不会被批量操作修改。</span></div><div class="table-wrap"><table><thead><tr><th><input type="checkbox" data-action="toggle-user-all" aria-label="全选当前用户"></th><th>用户完整资料</th><th>预约资料</th><th>账号状态</th><th>业务统计</th><th>时间 / 限制</th><th>操作</th></tr></thead><tbody>
+      <p>共 ${result.total} 个账号</p>
+      ${rows.length ? `<div id="user-bulk-actions" class="toolbar" hidden><strong data-selected-user-count>已选择 0 个用户</strong><button type="button" class="danger" data-action="bulk-purge-users" hidden>永久删除所选已注销账号</button><button type="button" class="danger" data-action="bulk-delete-users">注销账号</button><button type="button" class="primary" data-action="bulk-limit-users">批量限制访问</button><button type="button" class="ghost" data-action="bulk-restore-users">批量恢复权限</button></div><div class="table-wrap"><table><thead><tr><th><input type="checkbox" data-action="toggle-user-all" aria-label="全选当前用户"></th><th>平台账号</th><th>姓名 / 学号</th><th>账号状态</th><th>业务统计</th><th>时间 / 限制</th><th>操作</th></tr></thead><tbody>
         ${rows.map((row) => `<tr>
-          <td><input type="checkbox" class="user-select" value="${escapeHtml(row.id)}" data-account-status="${escapeHtml(row.account_status)}" aria-label="选择 ${escapeHtml(row.nickname || "用户")}"></td><td><strong>${escapeHtml(row.nickname || "川农同学")}</strong><br>${escapeHtml(row.phone || "无手机号")}<br><span class="subtle">用户编号：${escapeHtml(row.user_code || "待生成")}</span><br><span class="subtle">内部 UUID：${escapeHtml(row.id)}</span></td>
-          <td><strong>${escapeHtml(row.reservation_student_id || "未填写")}</strong><br><span class="subtle">${escapeHtml(row.reservation_name || "—")} · ${row.reservation_profile_consented_at ? "用户已同意" : "未记录同意"}</span></td>
+          <td><input type="checkbox" class="user-select" value="${escapeHtml(row.id)}" data-account-status="${escapeHtml(row.account_status)}" aria-label="选择 ${escapeHtml(row.nickname || "用户")}"></td><td><strong>${escapeHtml(row.nickname || "川农同学")}</strong><br>${escapeHtml(row.phone || "无手机号")}</td>
+          <td><strong>${escapeHtml(row.real_name || "未绑定")}</strong><br>${escapeHtml(row.student_id || "—")}<br>${row.identity_status === "VERIFIED" ? "已核验" : row.identity_status === "PENDING" ? "待核验" : "未绑定"}</td>
           <td>${badge(row.account_type)}<br>${accountBadge(row.account_status)}</td>
           <td><span class="subtle">预约 ${row.reservation_count} · 失物 ${row.lost_found_count}<br>资料浏览 ${row.resource_view_count} · 收藏 ${row.resource_favorite_count}<br>投诉 ${row.resource_complaint_count} · 反馈 ${row.feedback_count}</span></td>
           <td><span class="subtle">注册 ${formatTime(row.created_at)}<br>活跃 ${formatTime(row.last_active_at)}<br>${escapeHtml(row.restriction_reason || row.account_status_reason || "无限制")}</span></td>
@@ -569,7 +554,7 @@ const renderers = {
     content.innerHTML = `
       <div class="drilldown-header"><button type="button" class="ghost" data-action="back-overview">← 返回工作台</button><strong>${escapeHtml(title)}</strong><span class="muted">共 ${result.total} 个用户</span></div>
       ${result.items.length ? `<div class="table-wrap"><table><thead><tr><th>用户</th><th>类型 / 状态</th><th>首次使用</th><th>最近活跃</th><th>关联设备</th><th>安装实例</th></tr></thead><tbody>
-        ${result.items.map((row) => `<tr><td><strong>${escapeHtml(row.displayName)}</strong><br><span class="subtle">用户编号：${escapeHtml(row.identityCode)}</span>${row.phoneMasked ? `<br><span class="subtle">${escapeHtml(row.phoneMasked)}</span>` : ""}</td><td>${badge(row.identityType)}<br><span class="subtle">${escapeHtml(statusText(row.status))}</span></td><td>${formatTime(row.firstSeenAt)}</td><td>${formatTime(row.lastActiveAt)}</td><td>${row.deviceCount}</td><td>${row.installationCount}</td></tr>`).join("")}
+        ${result.items.map((row) => `<tr><td><strong>${escapeHtml(row.displayName)}</strong>${row.phoneMasked ? `<br><span class="subtle">${escapeHtml(row.phoneMasked)}</span>` : ""}</td><td>${badge(row.identityType)}<br><span class="subtle">${escapeHtml(statusText(row.status))}</span></td><td>${formatTime(row.firstSeenAt)}</td><td>${formatTime(row.lastActiveAt)}</td><td>${row.deviceCount}</td><td>${row.installationCount}</td></tr>`).join("")}
       </tbody></table></div>` : '<div class="empty">暂无符合条件的数据</div>'}
       ${drilldownPagination(result, "canonicalUsers", filters)}`;
   },
@@ -592,7 +577,7 @@ const renderers = {
     const title = filters.title || "安装实例明细";
     content.innerHTML = `
       <div class="drilldown-header"><button type="button" class="ghost" data-action="back-overview">← 返回工作台</button><strong>${escapeHtml(title)}</strong><span class="muted">共 ${result.total} 个安装实例</span></div>
-      ${result.items.length ? `<div class="table-wrap"><table><thead><tr><th>安装业务标识</th><th>所属设备</th><th>首次出现</th><th>最近活动</th><th>App 版本</th><th>安装类型</th></tr></thead><tbody>
+      ${result.items.length ? `<div class="table-wrap"><table><thead><tr><th>安装业务标识</th><th>所属设备</th><th>首次出现</th><th>最近活动</th><th>应用版本</th><th>安装类型</th></tr></thead><tbody>
         ${result.items.map((row) => `<tr><td><strong>${escapeHtml(row.installationCode)}</strong></td><td>${escapeHtml(row.deviceCode)}</td><td>${formatTime(row.firstSeenAt)}</td><td>${formatTime(row.lastActiveAt)}</td><td>${escapeHtml(row.versionName || "—")} · ${escapeHtml(row.versionCode || "—")}</td><td>${row.isReinstallation ? '<span class="badge warn">重新安装</span>' : '<span class="badge ok">首次安装</span>'}</td></tr>`).join("")}
       </tbody></table></div>` : '<div class="empty">暂无符合条件的数据</div>'}
       ${drilldownPagination(result, "installations", filters)}`;
@@ -672,7 +657,7 @@ const renderers = {
         <label class="compact">状态<select name="status"><option value="">全部状态</option><option value="ACTIVE" ${filters.status === "ACTIVE" ? "selected" : ""}>已预约</option><option value="CANCELLED" ${filters.status === "CANCELLED" ? "selected" : ""}>已取消</option></select></label>
         <label class="compact">核验<select name="verificationStatus"><option value="">全部核验状态</option><option value="NOT_REQUIRED" ${filters.verificationStatus === "NOT_REQUIRED" ? "selected" : ""}>无需核验</option><option value="PENDING" ${filters.verificationStatus === "PENDING" ? "selected" : ""}>待核验</option><option value="VERIFIED" ${filters.verificationStatus === "VERIFIED" ? "selected" : ""}>已核验</option><option value="REJECTED" ${filters.verificationStatus === "REJECTED" ? "selected" : ""}>核验未通过</option></select></label>
         <label class="compact">场地号<input type="number" min="1" name="courtNumber" value="${escapeHtml(filters.courtNumber || "")}"></label>
-        <label>用户<input name="user" value="${escapeHtml(filters.user || "")}" placeholder="完整手机号、昵称、内部 ID、预约学号或姓名"></label>
+        <label>用户<input name="user" value="${escapeHtml(filters.user || "")}" placeholder="完整手机号、昵称、内部编号、预约学号或姓名"></label>
         <label>预约编号<input name="reservationId" value="${escapeHtml(filters.reservationId || "")}" placeholder="完整预约编号"></label>
         <button class="primary">筛选</button>
         <button type="button" class="ghost" data-action="clear-reservation-filter">清空</button>
@@ -694,7 +679,7 @@ const renderers = {
         <label class="compact">类型<select name="type"><option value="">全部</option><option value="LOST" ${filters.type === "LOST" ? "selected" : ""}>寻物</option><option value="FOUND" ${filters.type === "FOUND" ? "selected" : ""}>招领</option></select></label>
         <label class="compact">状态<input name="status" value="${escapeHtml(filters.status || "")}" placeholder="如 WAITING"></label>
         <label>关键词<input name="q" value="${escapeHtml(filters.q || "")}" placeholder="物品、地点或描述"></label>
-        <label>用户<input name="user" value="${escapeHtml(filters.user || "")}" placeholder="完整手机号、昵称、内部 ID 或预约学号"></label>
+        <label>用户<input name="user" value="${escapeHtml(filters.user || "")}" placeholder="完整手机号、昵称、内部编号或预约学号"></label>
         <button class="primary">筛选</button>
       </form>
       ${posts.length ? `<div class="toolbar"><button type="button" class="danger" data-action="bulk-delete-lost">批量删除已选内容</button><span class="muted">仅作用于已选失物内容，不会删除公告、资料、管理员或系统配置。</span></div><div class="table-wrap"><table><thead><tr><th><input type="checkbox" data-action="toggle-lost-all" aria-label="全选当前失物"></th><th>物品</th><th>类型</th><th>地点 / 日期</th><th>发布者</th><th>状态</th><th>举报</th><th>操作</th></tr></thead><tbody>
@@ -748,7 +733,7 @@ const renderers = {
         <label>关键词<input name="q" value="${escapeHtml(filters.q || "")}" placeholder="标题、简介或标签"></label>
         <label class="compact">分类<input name="category" value="${escapeHtml(filters.category || "")}"></label>
         <label class="compact">状态<select name="status">${options(["DRAFT","PUBLISHED","UNLISTED"], filters.status, true)}</select></label>
-        <label>投诉用户<input name="user" value="${escapeHtml(filters.user || "")}" placeholder="完整手机号、昵称、内部 ID 或预约学号"></label>
+        <label>投诉用户<input name="user" value="${escapeHtml(filters.user || "")}" placeholder="完整手机号、昵称、内部编号或预约学号"></label>
         <label class="compact">投诉状态<select name="complaintStatus">${options(["OPEN","PROCESSING","RESOLVED","CLOSED"], filters.complaintStatus, true)}</select></label>
         <button class="primary">筛选</button>
       </form>
@@ -781,11 +766,11 @@ const renderers = {
           ${announcementFields()}
           <label>标题<input name="title" maxlength="100" required></label>
           <label>内容<textarea name="content" maxlength="4000" required></textarea></label>
-          <label class="checkbox-row"><input type="checkbox" name="enabled" checked> 发布后立即在 App 配置接口中可见</label>
-          <label class="checkbox-row"><input type="checkbox" name="serviceVisible" checked> 显示在 App 服务页“服务动态”</label>
-          <label class="checkbox-row"><input type="checkbox" name="notificationEnabled"> 提醒已关注本板块的用户（App 同步后提醒）</label>
-          <label class="checkbox-row"><input type="checkbox" name="popupEnabled"> 向已关注本板块的用户显示 App 内弹窗</label>
-          <p class="muted">通知和弹窗默认关闭，仅向主动关注本板块的用户提醒。未关注的用户仍可在服务页浏览内容。当前由 App 启动或回到前台时同步生效。</p>
+          <label class="checkbox-row"><input type="checkbox" name="enabled" checked> 发布后立即在应用配置接口中可见</label>
+          <label class="checkbox-row"><input type="checkbox" name="serviceVisible" checked> 显示在应用服务页“服务动态”</label>
+          <label class="checkbox-row"><input type="checkbox" name="notificationEnabled"> 提醒已关注本板块的用户（应用同步后提醒）</label>
+          <label class="checkbox-row"><input type="checkbox" name="popupEnabled"> 向已关注本板块的用户显示 应用内弹窗</label>
+          <p class="muted">通知和弹窗默认关闭，仅向主动关注本板块的用户提醒。未关注的用户仍可在服务页浏览内容。当前由应用启动或回到前台时同步生效。</p>
           <div><button class="primary">发布公告</button></div>
         </form>
       </article>
@@ -800,7 +785,7 @@ const renderers = {
     content.innerHTML = `
       <article class="card">
         <h3>发布网站公告</h3>
-        <p class="muted">网站公告只显示在 未来配置的产品官网，不会进入 App 公告或 App 服务动态。</p>
+        <p class="muted">网站公告只显示在 未来配置的产品官网，不会进入 应用公告或应用服务动态。</p>
         <form id="website-announcement-form" class="stack">
           <label>标题<input name="title" maxlength="100" required></label>
           <label>内容<textarea name="content" maxlength="4000" required></textarea></label>
@@ -826,48 +811,49 @@ const renderers = {
     const appConfig = data.appConfig || {};
     const activeAppConfig = appConfig.active || {};
     const appConfigRevisions = appConfig.revisions || [];
+    const configStatus = value => ({DRAFT: "草稿", ACTIVE: "已生效", ARCHIVED: "已归档"})[value] || value || "—";
     const availableVersions = data.availableVersions || [];
     const configuredCode = Number(version.latest_version_code || 1);
     const metadataState = version.metadata_verified ? "已自动校验" : "尚未完成自动校验";
     const minimumCode = Number(policy.minimumSupportedVersionCode || 1);
     const forceEnabled = Boolean(policy.forceUpdateEnabled);
     const affectedVersions = forceEnabled
-      ? `versionCode ${Math.max(1, minimumCode - 1)} 及以下`
+      ? `内部版本号 ${Math.max(1, minimumCode - 1)} 及以下`
       : "无（强制更新已关闭）";
     content.innerHTML = `
       <div class="grid two-columns">
         <article class="card">
-          <h3>Android Release Metadata</h3>
-          <p class="muted">这里只维护已经发布的 APK 事实，不控制当前是否强制更新。</p>
+          <h3>安卓版本</h3>
+
           <form id="version-form" class="stack">
-            <label>最新发布版本名称（给用户看的版本）<input name="latestVersionName" value="${escapeHtml(version.latest_version_name || "")}" placeholder="例如 1.0.4" required></label>
-            <label>Android 内部版本号（只用于递增比较）<input type="number" min="1" name="latestVersionCode" value="${configuredCode}" required><span class="subtle">后台展示为 V${escapeHtml(version.latest_version_name || "—")}（${configuredCode}）。客户端更新只比较这个整数。</span></label>
+            <label>最新发布版本名称<input name="latestVersionName" value="${escapeHtml(version.latest_version_name || "")}" placeholder="例如 1.0.4" required></label>
+            <label>安卓内部版本号<input type="number" min="1" name="latestVersionCode" value="${configuredCode}" required></label>
             <label>更新说明<textarea name="updateMessage">${escapeHtml(version.update_message || "")}</textarea></label>
-            <label>正式 APK 下载地址<input name="downloadUrl" value="${escapeHtml(version.download_url || "")}" placeholder="https://..." required></label>
+            <label>安装包下载地址<input name="downloadUrl" value="${escapeHtml(version.download_url || "")}" placeholder="https://..." required></label>
             <label>发布状态<select name="status">${options(["DRAFT","PUBLISHED","DISABLED"], version.status || "DRAFT")}</select></label>
-            <label>APK SHA-256（自动读取）<input name="apkSha256" maxlength="64" value="${escapeHtml(version.apk_sha256 || "")}" readonly></label>
-            <label>APK 大小（自动读取）<input type="number" min="1" name="apkSize" value="${version.apk_size || ""}" readonly></label>
+            <label>安装包校验值<input name="apkSha256" maxlength="64" value="${escapeHtml(version.apk_sha256 || "")}" readonly></label>
+            <label>安装包大小<input type="number" min="1" name="apkSize" value="${version.apk_size || ""}" readonly></label>
             <label>正式包名（自动校验）<input name="packageName" value="${escapeHtml(version.package_name || "com.mychuannong.app")}" readonly></label>
-            <label>正式签名证书 SHA-256（自动校验）<input name="signingCertificateSha256" value="${escapeHtml(version.signing_certificate_sha256 || "")}" readonly></label>
+            <label>签名证书校验值<input name="signingCertificateSha256" value="${escapeHtml(version.signing_certificate_sha256 || "")}" readonly></label>
             <input type="hidden" name="metadataVerified" value="${version.metadata_verified ? "true" : "false"}">
-            <p class="muted">APK 元数据状态：<strong>${metadataState}</strong>。Draft 可暂缺发布材料；保存为 Published 时，服务端必须验证下载文件大小、SHA-256、包名与正式签名证书。</p>
+            <p>校验状态：<strong>${metadataState}</strong></p>
             <button class="primary">保存并校验版本配置</button>
           </form>
         </article>
         <article class="card">
-          <h3>Update Policy 实时控制</h3>
-          <p class="muted">保存后会立即重新 GET 服务器状态；页面只显示回读确认后的结果。</p>
+          <h3>更新策略</h3>
+
           <form id="update-policy-form" class="stack">
             <div class="sub-card">
               <strong>当前最新版本</strong>
-              <p>V${escapeHtml(version.latest_version_name || "—")} / versionCode ${configuredCode}</p>
+              <p>V${escapeHtml(version.latest_version_name || "—")} / 内部版本号 ${configuredCode}</p>
             </div>
             <label class="checkbox-row"><input type="checkbox" name="updateEnabled" ${policy.updateEnabled ? "checked" : ""}> 开启更新检查</label>
             <label class="checkbox-row"><input type="checkbox" name="forceUpdateEnabled" ${forceEnabled ? "checked" : ""}> 开启强制更新</label>
-            <label>最低支持版本<select name="minimumSupportedVersionCode">${releaseVersionOptions(availableVersions, minimumCode)}</select><span class="subtle">强制更新开启时，仅低于此 versionCode 的旧客户端会被阻止；关闭强制更新后所有更新都可跳过。</span></label>
+            <label>最低支持版本<select name="minimumSupportedVersionCode">${releaseVersionOptions(availableVersions, minimumCode)}</select><span class="subtle">强制更新开启时，仅低于此内部版本号的旧客户端会被阻止；关闭强制更新后所有更新都可跳过。</span></label>
             <input type="hidden" name="expectedPolicyRevision" value="${Number(policy.policyRevision || 0)}">
             <div class="sub-card">
-              <p><strong>当前策略 Revision：</strong>${Number(policy.policyRevision || 0)}</p>
+              <p><strong>当前策略修订号：</strong>${Number(policy.policyRevision || 0)}</p>
               <p><strong>最后修改时间：</strong>${formatTime(policy.updatedAt)}</p>
               <p><strong>预计受影响版本：</strong>${escapeHtml(affectedVersions)}</p>
             </div>
@@ -875,50 +861,33 @@ const renderers = {
           </form>
         </article>
         <article class="card">
-          <h3>功能开放与维护</h3>
-          <p class="muted">关闭或维护时，App 仍保留入口，并向用户显示这里填写的说明。</p>
-          <div class="stack">
-            ${data.flags.filter((flag) => ["secondhand","lost_found","resource_library"].includes(flag.key)).map((flag) => `
-              <form class="feature-form sub-card" data-key="${escapeHtml(flag.key)}">
-                <div class="card-header"><strong>${flag.key === "secondhand" ? "二手好物" : flag.key === "lost_found" ? "失物招领" : "资料库"}</strong>${badge(flag.payload?.status || (flag.enabled ? "OPEN" : "CLOSED"))}</div>
-                <label>运行状态<select name="status">${options(["OPEN","CLOSED","MAINTENANCE"], flag.payload?.status || (flag.enabled ? "OPEN" : "CLOSED"))}</select></label>
-                <label>用户提示<textarea name="maintenanceNote" placeholder="例如：场馆规则调整中，预计今晚恢复">${escapeHtml(flag.payload?.maintenanceNote || "")}</textarea></label>
-                <label>预计恢复时间（可留空）<input type="datetime-local" name="expectedRestoreAt" value="${datetimeLocal(flag.payload?.expectedRestoreAt)}"></label>
-                <label>修改备注（可选）<input name="changeNote" maxlength="300" value="${escapeHtml(flag.changeNote || "")}" placeholder="仅用于管理员审计"></label>
-                <p class="muted">最后修改：${formatTime(flag.updatedAt)} · ${escapeHtml(flag.updatedBy || "系统初始化")}</p>
-                ${flag.key === "resource_library" ? `<label class="checkbox-row"><input type="checkbox" name="allowGuestBrowsing" ${flag.payload?.allowGuestBrowsing ? "checked" : ""}> 允许未登录用户只浏览公开资料</label>` : ""}
-                <button class="primary">保存状态</button>
-              </form>`).join("")}
-          </div>
-        </article>
-        <article class="card">
-          <h3>Remote Config 动态配置</h3>
-          <p class="muted">只允许发布已通过服务端白名单、URL 安全和大小限制校验的配置。App 会按 Server → Cache → Built-in Default 使用，并保留 last-known-good。</p>
+          <h3>动态配置</h3>
+
           <div class="sub-card">
             <strong>当前生效版本</strong>
-            <p>Config V${Number(appConfig.configVersion || 0)} · Revision ${Number(appConfig.activeRevision || 0)} · ${escapeHtml(activeAppConfig.configHash || "—")}</p>
-            <p class="subtle">更新时间：${formatTime(activeAppConfig.updatedAt)} · 状态：${escapeHtml(activeAppConfig.status || "—")}</p>
+            <p>配置版本 ${Number(appConfig.configVersion || 0)} · 修订号 ${Number(appConfig.activeRevision || 0)} · ${escapeHtml(activeAppConfig.configHash || "—")}</p>
+            <p class="subtle">更新时间：${formatTime(activeAppConfig.updatedAt)} · 状态：${escapeHtml(configStatus(activeAppConfig.status) || "—")}</p>
           </div>
           <form id="app-config-draft-form" class="stack">
-            <label>配置 JSON（只填写 config 对象）<textarea name="configJson" rows="18" spellcheck="false" required>${escapeHtml(JSON.stringify(activeAppConfig.config || {}, null, 2))}</textarea></label>
+            <label>配置内容<textarea name="configJson" rows="18" spellcheck="false" required>${escapeHtml(JSON.stringify(activeAppConfig.config || {}, null, 2))}</textarea></label>
             <div class="grid two-columns">
-              <label>最低 App versionCode<input type="number" min="0" name="minAppVersionCode" value="${Number(activeAppConfig.minAppVersionCode || 0)}"></label>
-              <label>最高 App versionCode（可留空）<input type="number" min="0" name="maxAppVersionCode" value="${activeAppConfig.maxAppVersionCode ?? ""}"></label>
+              <label>最低应用内部版本号<input type="number" min="0" name="minAppVersionCode" value="${Number(activeAppConfig.minAppVersionCode || 0)}"></label>
+              <label>最高应用内部版本号（可留空）<input type="number" min="0" name="maxAppVersionCode" value="${activeAppConfig.maxAppVersionCode ?? ""}"></label>
             </div>
-            <label>草稿备注（可选）<input name="reason" maxlength="300" placeholder="例如：Config V2 调整首页入口顺序"></label>
+            <label>草稿备注（可选）<input name="reason" maxlength="300" placeholder="例如：调整首页入口顺序"></label>
             <button class="primary">校验并保存草稿</button>
           </form>
           <form id="app-config-activate-form" class="stack">
-            <label>激活草稿<select name="revision" required>${appConfigRevisions.filter((row) => row.status === "DRAFT").map((row) => `<option value="${Number(row.revision)}">Config V${Number(row.configVersion)} · Revision ${Number(row.revision)}</option>`).join("") || '<option value="">暂无 DRAFT</option>'}</select></label>
+            <label>激活草稿<select name="revision" required>${appConfigRevisions.filter((row) => row.status === "DRAFT").map((row) => `<option value="${Number(row.revision)}">配置版本 ${Number(row.configVersion)} · 修订号 ${Number(row.revision)}</option>`).join("") || '<option value="">暂无草稿</option>'}</select></label>
             <input type="hidden" name="expectedActiveRevision" value="${Number(appConfig.activeRevision || 0)}">
             <button class="primary" ${appConfigRevisions.some((row) => row.status === "DRAFT") ? "" : "disabled"}>激活选中配置</button>
           </form>
           <form id="app-config-rollback-form" class="stack">
-            <label>回滚目标<select name="targetRevision" required>${appConfigRevisions.filter((row) => Number(row.revision) !== Number(appConfig.activeRevision)).map((row) => `<option value="${Number(row.revision)}">Config V${Number(row.configVersion)} · Revision ${Number(row.revision)} · ${escapeHtml(row.status || "")}</option>`).join("") || '<option value="">暂无可回滚版本</option>'}</select></label>
+            <label>回滚目标<select name="targetRevision" required>${appConfigRevisions.filter((row) => Number(row.revision) !== Number(appConfig.activeRevision)).map((row) => `<option value="${Number(row.revision)}">配置版本 ${Number(row.configVersion)} · 修订号 ${Number(row.revision)} · ${escapeHtml(configStatus(row.status) || "")}</option>`).join("") || '<option value="">暂无可回滚版本</option>'}</select></label>
             <input type="hidden" name="expectedActiveRevision" value="${Number(appConfig.activeRevision || 0)}">
-            <button class="danger" ${appConfigRevisions.some((row) => Number(row.revision) !== Number(appConfig.activeRevision)) ? "" : "disabled"}>回滚为新的 Config 版本</button>
+            <button class="danger" ${appConfigRevisions.some((row) => Number(row.revision) !== Number(appConfig.activeRevision)) ? "" : "disabled"}>回滚为新的配置版本</button>
           </form>
-          <div class="sub-card"><strong>最近配置 Revision</strong><ul>${appConfigRevisions.slice(0, 8).map((row) => `<li>Revision ${Number(row.revision)} · Config V${Number(row.configVersion)} · ${escapeHtml(row.status || "")} · ${escapeHtml(row.configHash || "")}</li>`).join("") || "<li>暂无记录</li>"}</ul></div>
+          <div class="sub-card"><strong>最近配置修订</strong><ul>${appConfigRevisions.slice(0, 8).map((row) => `<li>修订号 ${Number(row.revision)} · 配置版本 ${Number(row.configVersion)} · ${escapeHtml(configStatus(row.status) || "")} · ${escapeHtml(row.configHash || "")}</li>`).join("") || "<li>暂无记录</li>"}</ul></div>
         </article>
       </div>`;
   },
@@ -931,7 +900,7 @@ const renderers = {
         <label class="compact">状态<select name="status">${feedbackStatusOptions(filters.status, true)}</select></label>
         <label class="compact">类型<select name="category">${feedbackCategoryOptions(filters.category, true)}</select></label>
         <label>关键词<input name="q" value="${escapeHtml(filters.q || "")}" placeholder="标题、内容或反馈编号"></label>
-        <label>用户<input name="user" value="${escapeHtml(filters.user || "")}" placeholder="完整手机号、昵称或内部 ID"></label>
+        <label>用户<input name="user" value="${escapeHtml(filters.user || "")}" placeholder="完整手机号、昵称或内部编号"></label>
         <label class="compact">开始日期<input type="date" name="from" value="${escapeHtml(filters.from || "")}"></label>
         <label class="compact">结束日期<input type="date" name="to" value="${escapeHtml(filters.to || "")}"></label>
         <label class="compact">时间顺序<select name="sort"><option value="DESC" ${filters.sort !== "ASC" ? "selected" : ""}>最新优先</option><option value="ASC" ${filters.sort === "ASC" ? "selected" : ""}>最早优先</option></select></label>
@@ -957,7 +926,7 @@ const renderers = {
     const params = new URLSearchParams(filters);
     const rows = await api(`/api/v1/admin/resource-complaints?${params}`);
     content.innerHTML = `${Object.keys(filters).length ? `<div class="filter-summary"><span>当前筛选：${escapeHtml(Object.values(filters).join(" · "))}</span><button class="ghost" data-action="clear-page-filter">清除筛选</button></div>` : ""}
-      <form id="resource-complaint-filter" class="toolbar"><label class="compact">状态<select name="status">${options(["OPEN","PROCESSING","RESOLVED","CLOSED"], filters.status, true)}</select></label><label>用户<input name="user" value="${escapeHtml(filters.user || "")}" placeholder="完整手机号、昵称或内部 ID"></label><button class="primary">筛选</button></form>
+      <form id="resource-complaint-filter" class="toolbar"><label class="compact">状态<select name="status">${options(["OPEN","PROCESSING","RESOLVED","CLOSED"], filters.status, true)}</select></label><label>用户<input name="user" value="${escapeHtml(filters.user || "")}" placeholder="完整手机号、昵称或内部编号"></label><button class="primary">筛选</button></form>
       ${rows.length ? `<div class="table-wrap"><table><thead><tr><th>资料</th><th>原因</th><th>用户</th><th>时间</th><th>状态</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.resource_title || row.resource_id)}</td><td>${escapeHtml(row.reason)}<br><span class="subtle">${escapeHtml(row.detail || "")}</span></td><td>${escapeHtml(row.nickname || row.phone_masked || "用户")}</td><td>${formatTime(row.created_at)}</td><td><select data-action="resource-complaint-status" data-id="${escapeHtml(row.id)}">${options(["OPEN","PROCESSING","RESOLVED","CLOSED"], row.status)}</select></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">暂无符合条件的资料投诉</div>'}`;
   },
 
@@ -975,21 +944,21 @@ const renderers = {
     const filterLabels = {...filters};
     if (filterLabels.firstLoginToday) filterLabels.firstLoginToday = "今日首次登录账号";
     const summary = Object.keys(filters).length ? `<div class="filter-summary"><span>当前筛选：${escapeHtml(Object.values(filterLabels).join(" · "))}</span><button class="ghost" data-action="clear-page-filter">清除筛选</button></div>` : "";
-    content.innerHTML = `${summary}<article class="card"><p class="muted">仅记录我的川农账号使用后端服务所需的最小事件，默认保留 ${data.retentionDays} 天；不包含教务账号、课表、成绩、密码、Cookie、Session 或完整 Token。</p></article>
-      <form id="user-event-filter" class="toolbar"><label>用户<input name="user" value="${escapeHtml(filters.user || "")}" placeholder="内部 ID、昵称或完整手机号"></label><label class="compact">模块<input name="module" value="${escapeHtml(filters.module || "")}" placeholder="如 ACCOUNT"></label><label class="compact">事件<input name="eventType" value="${escapeHtml(filters.eventType || "")}" placeholder="如 LOGIN_FAILURE"></label><label class="compact">结果<select name="result">${options(["SUCCESS","FAILURE","DENIED"], filters.result, true)}</select></label><button class="primary">筛选</button></form>
+    content.innerHTML = `${summary}
+      <form id="user-event-filter" class="toolbar"><label>用户<input name="user" value="${escapeHtml(filters.user || "")}" placeholder="内部编号、昵称或完整手机号"></label><label class="compact">模块<input name="module" value="${escapeHtml(filters.module || "")}" placeholder="如 ACCOUNT"></label><label class="compact">事件<input name="eventType" value="${escapeHtml(filters.eventType || "")}" placeholder="如 LOGIN_FAILURE"></label><label class="compact">结果<select name="result">${options(["SUCCESS","FAILURE","DENIED"], filters.result, true)}</select></label><button class="primary">筛选</button></form>
       <p class="muted">共 ${data.total} 条，本页最多显示 ${data.limit} 条。</p>
       ${data.items.length ? `<div class="table-wrap"><table><thead><tr><th>时间</th><th>用户</th><th>模块 / 事件</th><th>结果</th><th>目标</th><th>风险</th></tr></thead><tbody>${data.items.map((row) => `<tr><td>${formatTime(row.created_at)}</td><td>${escapeHtml(row.nickname || "已注销用户")}<br><span class="subtle">${escapeHtml(row.phone_masked || row.user_id || "—")}</span></td><td>${escapeHtml(row.module)}<br><span class="subtle">${escapeHtml(row.event_type)}</span></td><td>${badge(row.result)}</td><td>${escapeHtml(row.target_type || "—")} · ${escapeHtml(row.target_id || "—")}</td><td>${escapeHtml(row.risk_flag || "—")}</td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">没有符合条件的用户行为记录</div>'}`;
   },
 
   async riskCandidates(filters = {}) {
     const rows = await api(`/api/v1/admin/risk-candidates?${new URLSearchParams(filters)}`);
-    content.innerHTML = `${Object.keys(filters).length ? `<div class="filter-summary"><span>当前筛选：${escapeHtml(filters.status || "")}</span><button class="ghost" data-action="clear-page-filter">清除筛选</button></div>` : ""}<article class="card"><p class="muted">系统只生成可解释的人工复核候选，不会自动封禁或注销账号。</p></article>
+    content.innerHTML = `${Object.keys(filters).length ? `<div class="filter-summary"><span>当前筛选：${escapeHtml(filters.status || "")}</span><button class="ghost" data-action="clear-page-filter">清除筛选</button></div>` : ""}
       ${rows.length ? `<div class="table-wrap"><table><thead><tr><th>用户</th><th>触发规则</th><th>次数 / 时间范围</th><th>账号状态</th><th>处理</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.nickname)}<br><span class="subtle">${escapeHtml(row.phone_masked || row.user_id)}</span></td><td>${escapeHtml(row.rule_label)}<br><span class="subtle">${escapeHtml(row.rule_key)}</span></td><td>${row.trigger_count} 次<br><span class="subtle">${formatTime(row.window_started_at)} — ${formatTime(row.window_ended_at)}</span></td><td>${accountBadge(row.account_status)} · ${escapeHtml(row.status)}</td><td><button class="ghost" data-action="review-risk" data-id="${escapeHtml(row.id)}">人工处理</button></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">暂无异常候选</div>'}`;
   },
 
   async adminAudit() {
     const rows = await api("/api/v1/admin/audit-logs?limit=200");
-    content.innerHTML = `<article class="card"><p class="muted">仅超级管理员可访问。只显示真实管理员 Actor 执行的管理动作，不保存密码、完整 Token、教务凭据或敏感字段原文。</p></article>${rows.length ? `<div class="table-wrap"><table><thead><tr><th>时间</th><th>管理员</th><th>操作</th><th>对象</th><th>最小摘要</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${formatTime(row.created_at)}</td><td>${escapeHtml(row.actor_name || "管理员")}</td><td>${escapeHtml(row.action)}</td><td>${escapeHtml(row.entity_type)} · ${escapeHtml(row.entity_id || "—")}</td><td class="feedback-summary"><span>${escapeHtml(row.details_json || "{}")}</span></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">暂无管理员操作记录</div>'}`;
+    content.innerHTML = `${rows.length ? `<div class="table-wrap"><table><thead><tr><th>时间</th><th>管理员</th><th>操作</th><th>对象</th><th>最小摘要</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${formatTime(row.created_at)}</td><td>${escapeHtml(row.actor_name || "管理员")}</td><td>${escapeHtml(row.action)}</td><td>${escapeHtml(row.entity_type)} · ${escapeHtml(row.entity_id || "—")}</td><td class="feedback-summary"><span>${escapeHtml(row.details_json || "{}")}</span></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">暂无管理员操作记录</div>'}`;
   },
 };
 
@@ -1058,6 +1027,9 @@ function openDialog(title, html, onConfirm, confirmText = "保存") {
     }
   };
   dialog.onclose = () => {
+    // A detail dialog can be replaced immediately by another form. Its queued
+    // close event must not remove the new form's submit handler.
+    if (dialog.open) return;
     clearTimeout(state.phoneRevealTimer);
     clearTimeout(state.profileRevealTimer);
     state.phoneRevealTimer = null;
@@ -1303,7 +1275,7 @@ content.addEventListener("submit", async (event) => {
           reason: values.reason || "",
         },
       });
-      toast(`Remote Config 已校验并保存（${validated.configHash}）`);
+      toast(`动态配置 已校验并保存（${validated.configHash}）`);
       return renderers.config();
     }
     if (form.id === "app-config-activate-form") {
@@ -1316,9 +1288,9 @@ content.addEventListener("submit", async (event) => {
       });
       const confirmed = await api("/api/v1/admin/config");
       if (confirmed.appConfig?.activeRevision !== saved.activeRevision) {
-        throw new Error("Remote Config 激活回读不一致，结果未确认");
+        throw new Error("动态配置 激活回读不一致，结果未确认");
       }
-      toast(`Remote Config 已激活（Config V${confirmed.appConfig.configVersion}）`);
+      toast(`动态配置 已激活（配置版本 ${confirmed.appConfig.configVersion}）`);
       return renderers.config(confirmed);
     }
     if (form.id === "app-config-rollback-form") {
@@ -1331,9 +1303,9 @@ content.addEventListener("submit", async (event) => {
       });
       const confirmed = await api("/api/v1/admin/config");
       if (confirmed.appConfig?.activeRevision !== saved.activeRevision) {
-        throw new Error("Remote Config 回滚回读不一致，结果未确认");
+        throw new Error("动态配置 回滚回读不一致，结果未确认");
       }
-      toast(`Remote Config 已回滚为新的 Config V${confirmed.appConfig.configVersion}`);
+      toast(`动态配置 已回滚为新的 配置版本 ${confirmed.appConfig.configVersion}`);
       return renderers.config(confirmed);
     }
   } catch (error) {
@@ -1383,6 +1355,16 @@ content.addEventListener("change", async (event) => {
 });
 
 $("#dialog-content").addEventListener("click", (event) => {
+  const reviewButton = event.target.closest('[data-action="review-student"]');
+  if (reviewButton) {
+    const userId = reviewButton.dataset.id;
+    $("#dialog").close();
+    return openDialog("核验学生身份", `<div class="stack"><p>${escapeHtml(reviewButton.dataset.name)} · ${escapeHtml(reviewButton.dataset.student)}</p><label>核验结果<select name="action"><option value="approve">通过</option><option value="reject">驳回</option></select></label><label>核验依据 / 驳回原因<textarea name="reason" minlength="4" maxlength="300" required placeholder="填写已核对的独立凭证及核验结果"></textarea></label></div>`, async (form) => {
+      await api(`/api/v1/admin/users/${encodeURIComponent(userId)}/student-review`, {method: "POST", body: {action: form.get("action"), reason: form.get("reason")}});
+      toast("学生身份核验已保存");
+      renderers.users(state.filters);
+    }, "保存核验结果");
+  }
   const deleteButton = event.target.closest('[data-action="delete-user-account"]');
   if (deleteButton) {
     const user = JSON.parse(deleteButton.dataset.user);
@@ -1538,9 +1520,7 @@ content.addEventListener("click", async (event) => {
       const u = details.user;
       return openDialog("用户档案", `
         <div class="stack">
-          <p><strong>${escapeHtml(u.nickname)}</strong> · ${escapeHtml(u.phone || "无手机号")}</p>
-          <p>用户编号：<strong>${escapeHtml(u.user_code || "待生成")}</strong></p>
-          <details><summary>技术信息</summary><p class="muted">内部 UUID：${escapeHtml(u.id)}</p></details>
+          <p><strong>${escapeHtml(u.observed_real_name || u.real_name || u.nickname)}</strong> · ${escapeHtml(u.phone || "无手机号")}</p>
           <p>账号状态：${accountBadge(u.account_status)} · 原因：${escapeHtml(u.account_status_reason || "无")}</p>
           <p class="muted">注册：${formatTime(u.created_at)} · 最近活跃：${formatTime(u.last_active_at)} · 状态生效：${formatTime(u.account_status_changed_at)} · 到期：${formatTime(u.account_status_expires_at)}</p>
           <div class="grid two-columns">
@@ -1554,10 +1534,12 @@ content.addEventListener("click", async (event) => {
             ${relatedCard("用户反馈", details.feedback.length, "feedback", u)}
             ${relatedCard("用户行为记录", details.behaviorEvents.length, "userEvents", u)}
           </div>
-          <p>预约资料：<strong id="reservation-profile-value">${escapeHtml(u.reservation_name || "未填写")} · ${escapeHtml(u.reservation_student_id || "未填写")}</strong></p>
+          <p>学校姓名：${escapeHtml(u.observed_real_name || "")} · 年级：${escapeHtml(u.observed_grade || "")} · 学号：${escapeHtml(u.observed_student_id || "")}</p>
+          <p>学生身份：<strong>${escapeHtml(u.real_name || "未绑定")} · ${escapeHtml(u.student_id || "未绑定")}</strong></p><p>手机号验证：${u.phone_verified ? "已验证" : "待验证"}</p><p>预约资料：<strong id="reservation-profile-value">${escapeHtml(u.reservation_name || "未填写")} · ${escapeHtml(u.reservation_student_id || "未填写")}</strong></p>
+          ${u.identity_status === "PENDING" ? `<button type="button" class="primary" data-action="review-student" data-id="${escapeHtml(u.id)}" data-name="${escapeHtml(u.real_name)}" data-student="${escapeHtml(u.student_id)}">核验学生身份</button>` : ""}
           <p class="muted">用户确认：${u.reservation_profile_consented_at ? formatTime(u.reservation_profile_consented_at) : "未确认"} · 最后更新：${formatTime(u.reservation_profile_updated_at)}</p>
           <p class="muted">限制状态：${escapeHtml(details.restriction?.reason || "无限制")}</p>
-          <p class="muted">超级管理员可在管理工作台查看已收集的完整账号与预约资料；密码、哈希、Token、Session、Cookie 和教务数据永不展示。</p>
+
           ${u.account_status === "DELETED" ? '<p class="muted">该账号个人数据已清理，不能恢复；用户可使用原手机号重新注册。</p>' : `<button type="button" class="danger" data-action="delete-user-account" data-user="${escapeHtml(JSON.stringify(u))}">注销账号</button>`}
         </div>`, async () => {}, "关闭");
     }
@@ -1735,7 +1717,7 @@ content.addEventListener("click", async (event) => {
     }
     if (action === "toggle-resource") {
       const next = button.dataset.status === "PUBLISHED" ? "UNLISTED" : "PUBLISHED";
-      if (next === "UNLISTED" && !confirm("确认下架此资料？App 刷新后将不再显示。")) return;
+      if (next === "UNLISTED" && !confirm("确认下架此资料？应用刷新后将不再显示。")) return;
       await api(`/api/v1/admin/resources/${encodeURIComponent(button.dataset.id)}`, {
         method: "PATCH",
         body: { publishStatus: next },
@@ -1753,7 +1735,7 @@ content.addEventListener("click", async (event) => {
     }
     if (action === "toggle-announcement") {
       const next = button.dataset.enabled !== "true";
-      if (!next && !confirm("确认撤回这条公告？App 将不再获取到它。")) return;
+      if (!next && !confirm("确认撤回这条公告？应用将不再获取到它。")) return;
       await api(`/api/v1/admin/announcements/${encodeURIComponent(button.dataset.id)}`, {
         method: "PATCH",
         body: { enabled: next },
@@ -1762,7 +1744,7 @@ content.addEventListener("click", async (event) => {
       return renderers.announcements();
     }
     if (action === "delete-announcement") {
-      if (!confirm("确认永久删除这条公告？删除后 App 将不再显示，且无法从页面恢复。")) return;
+      if (!confirm("确认永久删除这条公告？删除后 应用将不再显示，且无法从页面恢复。")) return;
       await api(`/api/v1/admin/announcements/${encodeURIComponent(button.dataset.id)}`, {
         method: "DELETE",
       });
@@ -1771,7 +1753,7 @@ content.addEventListener("click", async (event) => {
     }
     if (action === "edit-announcement") {
       const row = announcementRows.find(item => item.id === button.dataset.id) || {};
-      return openDialog("编辑公告", `<div class="stack">${announcementFields(row)}<label>标题<input name="title" value="${escapeHtml(button.dataset.title)}" required></label><label>内容<textarea name="content" required>${escapeHtml(button.dataset.content)}</textarea></label><label class="checkbox-row"><input type="checkbox" name="serviceVisible" ${button.dataset.serviceVisible === "true" ? "checked" : ""}> 显示在 App 服务页“服务动态”</label><label class="checkbox-row"><input type="checkbox" name="notificationEnabled" ${button.dataset.notificationEnabled === "true" ? "checked" : ""}> 提醒已关注本板块的用户（App 同步后提醒）</label><label class="checkbox-row"><input type="checkbox" name="popupEnabled" ${button.dataset.popupEnabled === "true" ? "checked" : ""}> 向已关注本板块的用户显示 App 内弹窗</label><p class="muted">编辑不会因为公告 ID 不变而自动重新通知已经处理过的设备。</p></div>`,
+      return openDialog("编辑公告", `<div class="stack">${announcementFields(row)}<label>标题<input name="title" value="${escapeHtml(button.dataset.title)}" required></label><label>内容<textarea name="content" required>${escapeHtml(button.dataset.content)}</textarea></label><label class="checkbox-row"><input type="checkbox" name="serviceVisible" ${button.dataset.serviceVisible === "true" ? "checked" : ""}> 显示在应用服务页“服务动态”</label><label class="checkbox-row"><input type="checkbox" name="notificationEnabled" ${button.dataset.notificationEnabled === "true" ? "checked" : ""}> 提醒已关注本板块的用户（应用同步后提醒）</label><label class="checkbox-row"><input type="checkbox" name="popupEnabled" ${button.dataset.popupEnabled === "true" ? "checked" : ""}> 向已关注本板块的用户显示 应用内弹窗</label><p class="muted">编辑不会因为公告 ID 不变而自动重新通知已经处理过的设备。</p></div>`,
         async (form) => {
           await api(`/api/v1/admin/announcements/${encodeURIComponent(button.dataset.id)}`, {
             method: "PATCH",
