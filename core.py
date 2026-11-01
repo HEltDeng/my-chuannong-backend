@@ -155,8 +155,13 @@ def parse_pagination(
     raw_offset = str(query.get("offset", "0")).strip()
     if not raw_limit.isdigit() or not raw_offset.isdigit():
         raise ApiError(422, "VALIDATION_ERROR", "分页参数必须是非负整数")
-    limit = min(max(int(raw_limit), 1), max_limit)
-    offset = min(max(int(raw_offset), 0), max_offset)
+    try:
+        limit = min(max(int(raw_limit), 1), max_limit)
+        offset = min(max(int(raw_offset), 0), max_offset)
+    except ValueError as exc:
+        # isdigit also accepts characters such as superscripts, and Python
+        # rejects excessively long integers. Neither should become an HTTP 500.
+        raise ApiError(422, "VALIDATION_ERROR", "分页参数必须是非负整数") from exc
     return limit, offset
 
 

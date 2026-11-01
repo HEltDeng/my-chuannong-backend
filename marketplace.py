@@ -2,7 +2,6 @@
 import json
 import re
 import uuid
-from pathlib import Path
 from core import now_ms, parse_pagination, paginated_response
 from campus_hub import fail, text, choice, post_payload, post_view, dump, encrypted, CAMPUSES
 
