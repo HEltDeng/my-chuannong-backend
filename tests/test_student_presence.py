@@ -40,13 +40,13 @@ class StudentPresenceTest(unittest.TestCase):
         return result['data']
 
     def test_updated_local_password_policy_preserves_reporting_contract(self):
-        for version, policy in [(6, '2026-10-23.3'), (7, '2026-10-26.1')]:
+        for version, policy in [(6, '2026-10-23.3'), (7, '2026-10-26.1'), (8, '2026-11-08.1'), (9, '2026-11-16.1'), (10, '2026-11-17.1')]:
             self.assertEqual(200, self.send(self.payload(consentVersion=version, policyVersion=policy))[0])
-        status, result = self.call('GET', '/api/v1/admin/account-analytics/devices?platform=ios', token=self.admin)
-        self.assertEqual(200, status)
-        self.assertEqual(7, result['data']['items'][0]['consent_version'])
-        self.assertEqual('2026-10-26.1', result['data']['items'][0]['policy_version'])
-        for version, policy in [(6, '2026-10-26.1'), (7, '2026-10-23.3')]:
+            status, result = self.call('GET', '/api/v1/admin/account-analytics/devices?platform=ios', token=self.admin)
+            self.assertEqual(200, status)
+            self.assertEqual(version, result['data']['items'][0]['consent_version'])
+            self.assertEqual(policy, result['data']['items'][0]['policy_version'])
+        for version, policy in [(6, '2026-10-26.1'), (7, '2026-10-23.3'), (8, '2026-10-26.1'), (9, '2026-11-08.1'), (10, '2026-11-16.1')]:
             self.assertEqual(422, self.send(self.payload(consentVersion=version, policyVersion=policy))[0])
         for key in ['password', 'schoolPassword', 'unifiedCredential', 'cookies']:
             self.assertEqual(422, self.send(self.payload(consentVersion=7, policyVersion='2026-10-26.1', **{key:'synthetic-forbidden'}))[0])

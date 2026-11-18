@@ -3398,6 +3398,10 @@ class ApiHandler(BaseHTTPRequestHandler):
         )
         phone_auth.consent(data)
         password = phone_auth.confirmed_password(data)
+        registration_method = data.get('registrationMethod', 'sms')
+        if not isinstance(registration_method, str) or registration_method not in {'password', 'sms'}:
+            raise ApiError(422, 'INVALID_REGISTRATION_METHOD', '注册方式无效')
+        password_only = registration_method == 'password'
         if data.get('installationId') and len(str(data['installationId'])) > 100:
             raise ApiError(422, 'INVALID_INSTALLATION_ID', '安装标识无效')
         nickname = str(data.get("nickname", "川农同学")).strip()[:30] or "川农同学"
@@ -3406,7 +3410,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         digest, salt = password_record(password)
         with connection() as db:
             db.execute('BEGIN IMMEDIATE')
-            phone_auth.consume(db, data, digest_phone, 'register', globals())
+            if not password_only:
+                phone_auth.consume(db, data, digest_phone, 'register', globals())
             user_id = str(uuid.uuid4())
             created_at = now_ms()
             try:
@@ -3431,7 +3436,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                 )
             except sqlite3.IntegrityError as exc:
                 raise ApiError(409, "PHONE_EXISTS", "该账号已存在，请直接登录") from exc
-            db.execute('UPDATE users SET phone_verified_at=? WHERE id=?', (created_at, user_id))
+            if not password_only:
+                db.execute('UPDATE users SET phone_verified_at=? WHERE id=?', (created_at, user_id))
             phone_auth.save_consent(db, user_id, data)
             db.commit()
             migrated = migrate_device_data(

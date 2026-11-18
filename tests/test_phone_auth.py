@@ -96,7 +96,8 @@ class PhoneAuthTest(unittest.TestCase):
 
     def test_binding_encrypted_unique_immutable_and_admin_full_fields(self):
         a,_=self.register('13900000004');b,_=self.register('13900000005')
-        data={'studentId':'2026000001','realName':'合成同学','schoolCode':'SICAU',**self.receipt()}
+        data={'studentId':'2026000001','realName':'合成同学','schoolCode':'SICAU',**self.receipt(),
+              'policyVersion':'2026-11-16.1'}
         code,response=self.call('PUT','/api/v1/auth/student-identity',data,a['token'])
         self.assertEqual(200,code,response)
         self.assertEqual('PENDING',response['data']['identityStatus'])
@@ -108,6 +109,9 @@ class PhoneAuthTest(unittest.TestCase):
             self.assertIsNone(row['student_id'])
             self.assertNotIn(data['studentId'],row['identity_encrypted'])
             self.assertNotIn(data['realName'],row['identity_encrypted'])
+            self.assertEqual(data['policyVersion'], row['identity_policy_version'])
+            self.assertIsNotNone(db.execute('SELECT 1 FROM account_consents WHERE user_id=? AND policy_version=?',
+                                            (a['user']['id'], data['policyVersion'])).fetchone())
         details=self.call('GET','/api/v1/admin/users/'+a['user']['id']+'/details',token=self.admin)[1]['data']['user']
         self.assertEqual(data['studentId'],details['student_id'])
         self.assertEqual(data['realName'],details['real_name'])

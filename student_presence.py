@@ -14,7 +14,7 @@ import account_analytics
 
 POLICY_VERSION = '2026-10-23.3'
 CONSENT_VERSION = 6
-ACCEPTED_POLICIES = {6: POLICY_VERSION, 7: "2026-10-26.1"}
+ACCEPTED_POLICIES = {6: POLICY_VERSION, 7: "2026-10-26.1", 8: "2026-11-08.1", 9: "2026-11-16.1", 10: "2026-11-17.1"}
 RETENTION_DAYS = 180
 
 
@@ -289,7 +289,7 @@ def devices(db, query, api):
     if platform not in {'','ios','android'}: raise ApiError(422,'INVALID_FILTER','平台无效')
     sql=DIRECTORY.split(', latest AS (')[0]+      ''', device_rows AS (
        SELECT u.id,u.nickname,u.phone_encrypted,u.phone_masked,p.identity_encrypted,p.platform,p.manufacturer,p.model,p.os_version,
-       p.app_version,p.app_build,p.policy_version,CASE WHEN p.policy_version='2026-10-26.1' THEN 7 ELSE 6 END consent_version,p.accepted_at consent_accepted_at,p.received_at consent_received_at,
+       p.app_version,p.app_build,p.policy_version,CASE p.policy_version WHEN '2026-11-17.1' THEN 10 WHEN '2026-11-16.1' THEN 9 WHEN '2026-11-08.1' THEN 8 WHEN '2026-10-26.1' THEN 7 ELSE 6 END consent_version,p.accepted_at consent_accepted_at,p.received_at consent_received_at,
        p.first_at,p.last_at,p.installation_id FROM current_presence p LEFT JOIN users u ON u.id=p.current_user_id
        UNION ALL
        SELECT u.id,u.nickname,u.phone_encrypted,u.phone_masked,NULL,p.platform,p.manufacturer,p.model,p.os_version,

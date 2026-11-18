@@ -69,7 +69,7 @@ def initialize(db):
 
 def consent(data):
     accepted = data.get('consentAcceptedAt')
-    if (data.get('policyVersion') not in {POLICY_VERSION, '2026-10-23.3', '2026-10-26.1'} or type(accepted) is not int
+    if (data.get('policyVersion') not in {POLICY_VERSION, '2026-10-23.3', '2026-10-26.1', '2026-11-08.1', '2026-11-16.1', '2026-11-17.1'} or type(accepted) is not int
             or not 1792684800000 <= accepted <= now_ms() + 300000):
         raise ApiError(422, 'CONSENT_REQUIRED', '请先阅读并同意当前用户协议与隐私政策')
     return accepted
@@ -291,7 +291,7 @@ def bind_identity(handler, api):
         try:
             db.execute("""UPDATE users SET identity_encrypted=?,student_identity_hash=?,identity_name_hash=?,
                 identity_status='PENDING',identity_updated_at=?,identity_policy_version=? WHERE id=?""",
-                (encrypted, identity_hash, keyed(api, 'student-name', name), now_ms(), POLICY_VERSION, user['id']))
+                (encrypted, identity_hash, keyed(api, 'student-name', name), now_ms(), data['policyVersion'], user['id']))
         except sqlite3.IntegrityError:
             raise ApiError(409, 'STUDENT_ALREADY_BOUND', '该学号已绑定其他账号，请使用原账号或找回密码') from None
         save_consent(db, user['id'], data)
