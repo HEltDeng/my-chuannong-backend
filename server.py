@@ -17,6 +17,8 @@ import os
 import re
 import secrets
 import sqlite3
+import stat
+import tempfile
 import time
 import uuid
 import warnings
@@ -25,7 +27,7 @@ from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import parse_qs, urlparse, urlsplit
 from release_artifact import MAX_APK_BYTES, verify as verify_public_release_artifact
 from cryptography.fernet import Fernet, InvalidToken
@@ -1612,6 +1614,40 @@ def normalize_phone(value: Any) -> str:
     return phone
 
 
+def _local_key(path: Path, generate: Callable[[], bytes]) -> bytes:
+    """Publish a completed owner-only key without replacing another process's key."""
+    def read_existing() -> bytes:
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+        with os.fdopen(os.open(path, flags), "rb") as source:
+            mode = os.fstat(source.fileno()).st_mode
+            if not stat.S_ISREG(mode):
+                raise RuntimeError("Local key must be a regular file")
+            if hasattr(os, "fchmod") and stat.S_IMODE(mode) != 0o600:
+                os.fchmod(source.fileno(), 0o600)
+            return source.read()
+
+    try:
+        return read_existing()
+    except FileNotFoundError:
+        pass
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(generate())
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
+            pass  # Another initializer published its complete key first.
+        return read_existing()
+    finally:
+        os.unlink(temporary)
+
+
 @lru_cache(maxsize=1)
 def phone_hash_secret() -> bytes:
     configured = os.getenv("MY_CHUANNONG_PHONE_HASH_SECRET", "").encode()
@@ -1619,15 +1655,10 @@ def phone_hash_secret() -> bytes:
         return configured
     if RUNTIME.is_production:
         raise RuntimeError("MY_CHUANNONG_PHONE_HASH_SECRET is required in production")
-    secret_path = DB_PATH.parent / ".phone-hash-secret"
-    secret_path.parent.mkdir(parents=True, exist_ok=True)
-    if secret_path.is_file():
-        existing = secret_path.read_bytes()
-        if len(existing) >= 32:
-            return existing
-    generated = secrets.token_bytes(48)
-    secret_path.write_bytes(generated)
-    return generated
+    key = _local_key(DB_PATH.parent / ".phone-hash-secret", lambda: secrets.token_bytes(48))
+    if len(key) < 32:
+        raise RuntimeError("Existing phone hash key is invalid")
+    return key
 
 
 def phone_digest(phone: str) -> str:
@@ -1896,12 +1927,8 @@ def pii_cipher() -> Fernet:
         key = configured
     elif RUNTIME.is_production:
         raise RuntimeError("MY_CHUANNONG_PII_ENCRYPTION_KEY is required in production")
-    elif key_path.is_file():
-        key = key_path.read_bytes().strip()
     else:
-        key_path.parent.mkdir(parents=True, exist_ok=True)
-        key = Fernet.generate_key()
-        key_path.write_bytes(key)
+        key = _local_key(key_path, Fernet.generate_key).strip()
     try:
         return Fernet(key)
     except (ValueError, TypeError) as exc:
@@ -3000,11 +3027,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         elif method == "POST" and path == "/api/v1/auth/device":
             self.enforce_rate_limit("device-ip", client, 120, 3600)
         elif method == "POST" and path == "/api/v1/feedback":
-            token = self.headers.get("Authorization", "")
-            self.enforce_rate_limit("feedback", f"{client}:{token}", 10, 3600)
+            self.enforce_rate_limit("feedback-ip", client, 120, 300)
         elif method == "POST" and path.startswith("/api/v1/lost-found"):
-            token = self.headers.get("Authorization", "")
-            self.enforce_rate_limit("lost-found-write", f"{client}:{token}", 30, 3600)
+            self.enforce_rate_limit("lost-found-write-ip", client, 120, 300)
 
     def send_json(self, status: int, payload: Any) -> None:
         self._response_status = status
@@ -3222,8 +3247,13 @@ class ApiHandler(BaseHTTPRequestHandler):
         if method == "GET" and path == "/health":
             return {"status": "ok"}, 200
         if method == "GET" and path == "/ready":
-            if not database_integrity_check():
-                raise ApiError(503, "NOT_READY", "服务暂未就绪")
+            # Startup and backup jobs verify the entire database. Read one schema-backed
+            # row here so routine probes do not repeatedly scan every table and index.
+            try:
+                with connection() as db:
+                    db.execute("SELECT id FROM users LIMIT 1").fetchone()
+            except sqlite3.Error as exc:
+                raise ApiError(503, "NOT_READY", "服务暂未就绪") from exc
             return {"status": "ready"}, 200
         if method == "POST" and path == "/api/v1/auth/device":
             return self.auth_device(), 200
@@ -4194,13 +4224,14 @@ class ApiHandler(BaseHTTPRequestHandler):
         return name
 
     def lost_create(self) -> dict[str, Any]:
-        data = self.body_json()
-        values = self.validated_lost(data)
         post_id = str(uuid.uuid4())
         timestamp = now_ms()
         with connection() as db:
             user = self.current_user(db)
             require_account_operation(user)
+            self.enforce_rate_limit("lost-found-write", user["id"], 30, 3600)
+            data = self.body_json()
+            values = self.validated_lost(data)
             client_local_id = str(data.get("clientLocalId") or "")[:100] or None
             if client_local_id and db.execute(
                 """SELECT 1 FROM lost_found_deletion_tombstones
@@ -4302,6 +4333,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         with connection() as db:
             user = self.current_user(db)
             require_account_operation(user)
+            self.enforce_rate_limit("lost-found-write", user["id"], 30, 3600)
             if not db.execute("SELECT 1 FROM lost_found_posts WHERE id=?", (post_id,)).fetchone():
                 raise ApiError(404, "POST_NOT_FOUND", "失物信息不存在")
             existing = db.execute(
@@ -4330,6 +4362,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         with connection() as db:
             user = self.current_user(db)
             require_account_operation(user)
+            self.enforce_rate_limit("lost-found-write", user["id"], 30, 3600)
             post = db.execute("SELECT * FROM lost_found_posts WHERE id=?", (post_id,)).fetchone()
             if not post or post["type"] != "FOUND" or post["status"] == "RETURNED":
                 raise ApiError(409, "CLAIM_UNAVAILABLE", "当前不能申请认领")
@@ -4343,10 +4376,11 @@ class ApiHandler(BaseHTTPRequestHandler):
             return {"postId": post_id, "submitted": True, "message": "认领申请已记录；本阶段不提供站内联系"}
 
     def lost_report(self, post_id: str) -> dict[str, Any]:
-        data = self.body_json()
         with connection() as db:
             user = self.current_user(db)
             require_account_operation(user)
+            self.enforce_rate_limit("lost-found-write", user["id"], 30, 3600)
+            data = self.body_json()
             if not db.execute("SELECT 1 FROM lost_found_posts WHERE id=?", (post_id,)).fetchone():
                 raise ApiError(404, "POST_NOT_FOUND", "失物信息不存在")
             report_id = str(uuid.uuid4())
@@ -4885,10 +4919,11 @@ class ApiHandler(BaseHTTPRequestHandler):
         )
 
     def feedback_create(self) -> dict[str, Any]:
-        data = self.body_json()
         with connection() as db:
             user = self.current_user(db)
             require_account_operation(user)
+            self.enforce_rate_limit("feedback", user["id"], 10, 3600)
+            data = self.body_json()
             feedback_id = str(uuid.uuid4())
             timestamp = now_ms()
             title = required_text(data, "title", 80)
